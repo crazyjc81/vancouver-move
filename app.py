@@ -1780,9 +1780,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Constant Geographic Settings ---
-ANCHOR_COORDS = (49.2805, -123.1130) # 349 W Georgia St (Sony Pictures Imageworks @ The Post)
-ANCHOR_NAME = "Sony Pictures Imageworks (The Post)"
+# --- Dynamic Commute Anchor Setup (Defaults to Sony Pictures Imageworks) ---
+if "anchor_coords" not in st.session_state:
+    st.session_state.anchor_coords = (49.2805, -123.1130) # 349 W Georgia St (Sony Pictures Imageworks @ The Post)
+if "anchor_name" not in st.session_state:
+    st.session_state.anchor_name = "Sony Pictures Imageworks (The Post)"
+if "anchor_address_input" not in st.session_state:
+    st.session_state.anchor_address_input = "349 W Georgia St, Vancouver, BC"
+
+ANCHOR_COORDS = st.session_state.anchor_coords
+ANCHOR_NAME = st.session_state.anchor_name
 
 # --- Vancouver Water Body Mask ---
 # Polygons representing English Bay, Burrard Inlet, and False Creek to mask water bodies from isochrones
@@ -6879,6 +6886,42 @@ if "first_run_done" not in st.session_state:
 
 # --- Sidebar Controls ---
 st.sidebar.markdown("## 🧭 Controller Matrix")
+
+# Commute Destination Configuration (Workplace)
+with st.sidebar.container(border=True):
+    st.markdown("""
+    <div class="stage-header" style="background: linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(30, 41, 59, 0.05) 100%); border-left: 4px solid #f43f5e; color: #fecdd3; margin-bottom: 8px;">
+        <span class="stage-icon">🏢</span> Commute Destination
+    </div>
+    """, unsafe_allow_html=True)
+    
+    new_anchor_name = st.text_input(
+        "Destination Name",
+        value=st.session_state.anchor_name,
+        key="workplace_name_input",
+        help="Name of your workplace or commute destination."
+    )
+    
+    new_anchor_addr = st.text_input(
+        "Destination Address",
+        value=st.session_state.anchor_address_input,
+        key="workplace_address_input",
+        help="Address to calculate commutes from."
+    )
+    
+    if st.button("🔄 Update Destination", key="update_anchor_btn"):
+        if new_anchor_addr.strip():
+            coords = geocode_address(new_anchor_addr)
+            if coords:
+                st.session_state.anchor_coords = coords
+                st.session_state.anchor_name = new_anchor_name
+                st.session_state.anchor_address_input = new_anchor_addr
+                st.success(f"Updated destination to {new_anchor_name}!")
+                st.rerun()
+            else:
+                st.error("Could not find coordinates for this address. Please try another one.")
+        else:
+            st.warning("Please enter an address.")
 
 # Travel Blob Controller
 with st.sidebar.container(border=True):
