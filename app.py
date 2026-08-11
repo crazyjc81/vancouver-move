@@ -6016,10 +6016,10 @@ def scrape_hollyburn_vancouver(min_price=2000, max_price=5000, min_beds=2, max_b
 def geocode_address(address):
     """
     Geocodes a custom address via the free OpenStreetMap Nominatim API.
+    Bounds searches to Metro Vancouver region.
     """
-    clean_address = address + ", Metro Vancouver, BC"
-    query = urllib.parse.quote(clean_address)
-    url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1"
+    query = urllib.parse.quote(address)
+    url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1&bounded=1&viewbox=-123.3,49.35,-122.75,49.0"
     headers = {
         'User-Agent': 'VancouverMoveRelocationMatrix/1.0 (crazyjc@antigravity.ai)'
     }
