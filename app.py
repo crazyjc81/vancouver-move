@@ -6633,6 +6633,10 @@ def show_destination_setup_page():
         # Render interactive map centered at current coordinates
         from streamlit_folium import st_folium
         m = folium.Map(location=st.session_state.setup_coords, zoom_start=13, tiles="cartodbpositron")
+        m._id = "setup_map"
+        
+        # Add LatLngPopup to ensure Leaflet click events register on the map background
+        folium.LatLngPopup().add_to(m)
         
         # Add a nice styled marker for the selected setup coords
         folium.Marker(
