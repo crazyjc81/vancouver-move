@@ -32,6 +32,32 @@ def extract_polygons(geom):
         return polys
     return []
 
+
+# --- Nominatim Geocoding API for Custom Inputs ---
+def geocode_address(address):
+    """
+    Geocodes a custom address via the free OpenStreetMap Nominatim API.
+    Bounds searches to Metro Vancouver region.
+    """
+    query = urllib.parse.quote(address)
+    url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1&bounded=1&viewbox=-123.3,49.35,-122.75,49.0"
+    headers = {
+        'User-Agent': 'VancouverMoveRelocationMatrix/1.0 (crazyjc@antigravity.ai)'
+    }
+    
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            if data:
+                lat = float(data[0]['lat'])
+                lon = float(data[0]['lon'])
+                return lat, lon
+    except Exception as e:
+        st.error(f"Geocoding error: {e}")
+    return None
+
+
 # --- Persistent Listings & Transit Stops Helper Functions ---
 CUSTOM_LISTINGS_FILE = "custom_listings.json"
 
@@ -6909,19 +6935,37 @@ with st.sidebar.container(border=True):
         help="Address to calculate commutes from."
     )
     
-    if st.button("🔄 Update Destination", key="update_anchor_btn"):
+    # Initialize last_geocoded_address if not present
+    if "last_geocoded_address" not in st.session_state:
+        st.session_state.last_geocoded_address = st.session_state.anchor_address_input
+
+    addr_changed = (new_anchor_addr != st.session_state.last_geocoded_address)
+    name_changed = (new_anchor_name != st.session_state.anchor_name)
+    button_clicked = st.button("🔄 Update Destination", key="update_anchor_btn")
+    
+    if button_clicked or addr_changed:
+        st.session_state.last_geocoded_address = new_anchor_addr
         if new_anchor_addr.strip():
             coords = geocode_address(new_anchor_addr)
             if coords:
                 st.session_state.anchor_coords = coords
                 st.session_state.anchor_name = new_anchor_name
                 st.session_state.anchor_address_input = new_anchor_addr
+                # Clear map cache immediately
+                if "m_cached" in st.session_state:
+                    del st.session_state["m_cached"]
+                if "map_filters_stable" in st.session_state:
+                    del st.session_state["map_filters_stable"]
                 st.success(f"Updated destination to {new_anchor_name}!")
                 st.rerun()
             else:
                 st.error("Could not find coordinates for this address. Please try another one.")
         else:
             st.warning("Please enter an address.")
+    elif name_changed:
+        st.session_state.anchor_name = new_anchor_name
+        st.rerun()
+
 
 # Travel Blob Controller
 with st.sidebar.container(border=True):
@@ -8182,6 +8226,10 @@ with col_map:
         st.session_state["zoom"] = 12
         if "vancouver_move_map" in st.session_state:
             del st.session_state["vancouver_move_map"]
+        if "m_cached" in st.session_state:
+            del st.session_state["m_cached"]
+        if "map_filters_stable" in st.session_state:
+            del st.session_state["map_filters_stable"]
 
 
 
