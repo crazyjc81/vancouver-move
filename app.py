@@ -1472,6 +1472,31 @@ st.markdown("""
         box-shadow: none !important;
     }
 
+    /* Mobile Responsive Overrides */
+    @media (max-width: 768px) {
+        /* Enable vertical scrolling on mobile so stacked contents are reachable */
+        html, body, .stApp, .stAppViewContainer, .main, div[data-testid="stAppViewContainer"], div[data-testid="stAppViewBlockContainer"], .main .block-container {
+            overflow: auto !important;
+            scrollbar-width: auto !important;
+        }
+        
+        /* Limit map height on mobile so it doesn't push details off the viewport forever */
+        iframe {
+            height: 480px !important;
+        }
+        .stCustomComponentV1, div[data-testid="stHtml"]:has(iframe) {
+            height: 480px !important;
+        }
+        
+        /* Ensure stacked columns behave cleanly with nice spacing */
+        div[data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            padding: 0.5rem !important;
+            margin-bottom: 1rem;
+        }
+    }
+
     /* Remove empty space/gaps around the map and layout blocks */
     div[data-testid="stVerticalBlock"] > div:has(iframe) {
         padding: 0 !important;
@@ -6682,7 +6707,7 @@ def show_destination_setup_page():
         ).add_to(m)
         
         map_key = f"setup_map_canvas_{st.session_state.setup_coords[0]:.4f}_{st.session_state.setup_coords[1]:.4f}"
-        map_data = st_folium(m, height=420, width=550, key=map_key, returned_objects=["last_clicked"])
+        map_data = st_folium(m, height=420, use_container_width=True, key=map_key, returned_objects=["last_clicked"])
         st.write("Debug Map Data:", map_data)
         
         if map_data and map_data.get("last_clicked"):
@@ -7174,7 +7199,7 @@ with st.sidebar.container(border=True):
 
     addr_changed = (new_anchor_addr != st.session_state.last_geocoded_address)
     name_changed = (new_anchor_name != st.session_state.anchor_name)
-    button_clicked = st.button("🔄 Update Destination", key="update_anchor_btn")
+    button_clicked = st.button("🔄 Update Destination", key="update_anchor_btn", use_container_width=True)
     
     if button_clicked or addr_changed:
         st.session_state.last_geocoded_address = new_anchor_addr
@@ -7622,7 +7647,7 @@ st.sidebar.markdown("### ➕ Add Custom Listing")
 
 ext_url = st.sidebar.text_input("Paste Listing URL", placeholder="e.g. rentals.ca/listing-id", key="custom_url_input")
 
-if st.sidebar.button("⚡ Extract & Add Listing", key="add_custom_btn"):
+if st.sidebar.button("⚡ Extract & Add Listing", key="add_custom_btn", use_container_width=True):
     if ext_url:
         with st.spinner("Extracting listing details..."):
             extracted = extract_listing_details_from_url(ext_url)
