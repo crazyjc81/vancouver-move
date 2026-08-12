@@ -6519,9 +6519,10 @@ def fetch_descriptions_for_candidates(candidates):
 # --- Main App Execution State ---
 def show_destination_setup_page():
     # Synchronize widget state with coordinates from map click before widget instantiation to avoid StreamlitAPIException
-    if "setup_address_widget" in st.session_state and "setup_address_input" in st.session_state:
-        if st.session_state.setup_address_widget != st.session_state.setup_address_input:
+    if st.session_state.get("map_clicked_trigger"):
+        if "setup_address_input" in st.session_state:
             st.session_state.setup_address_widget = st.session_state.setup_address_input
+        st.session_state.map_clicked_trigger = False
 
     # Setup custom styling
     st.markdown("""
@@ -6679,9 +6680,10 @@ def show_destination_setup_page():
                     st.session_state.temp_clicked_coords = (lat, lon)
                     st.session_state.setup_coords = (lat, lon)
                     st.session_state.setup_address_input = f"{lat:.5f}, {lon:.5f}"
+                    st.session_state.map_clicked_trigger = True
                     try:
                         with open(log_file, "a", encoding="utf-8") as f:
-                            f.write(f"Updated setup_coords to {(lat, lon)}. Triggering rerun.\n")
+                            f.write(f"Updated setup_coords to {(lat, lon)} and set map_clicked_trigger. Triggering rerun.\n")
                     except Exception:
                         pass
                     st.rerun()
