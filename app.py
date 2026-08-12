@@ -6673,10 +6673,13 @@ def show_destination_setup_page():
                 if st.session_state.get("temp_clicked_coords") != (lat, lon):
                     st.session_state.temp_clicked_coords = (lat, lon)
                     st.session_state.setup_coords = (lat, lon)
-                    st.session_state.setup_address_input = f"{lat:.5f}, {lon:.5f}"
+                    # Update both the internal input value and the widget state to reflect in UI
+                    addr_str = f"{lat:.5f}, {lon:.5f}"
+                    st.session_state.setup_address_input = addr_str
+                    st.session_state.setup_address_widget = addr_str
                     try:
                         with open(log_file, "a", encoding="utf-8") as f:
-                            f.write(f"Updated setup_coords to {(lat, lon)}. Triggering rerun.\n")
+                            f.write(f"Updated setup_coords to {(lat, lon)} and setup_address_widget to {addr_str}. Triggering rerun.\n")
                     except Exception:
                         pass
                     st.rerun()
