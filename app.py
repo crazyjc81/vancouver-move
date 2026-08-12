@@ -6645,7 +6645,8 @@ def show_destination_setup_page():
             icon=folium.Icon(color="purple", icon="briefcase", prefix="fa")
         ).add_to(m)
         
-        map_data = st_folium(m, height=420, width=None, key="setup_map_canvas")
+        map_key = f"setup_map_canvas_{st.session_state.setup_coords[0]:.4f}_{st.session_state.setup_coords[1]:.4f}"
+        map_data = st_folium(m, height=420, width=None, key=map_key, returned_objects=["last_clicked"])
         st.write("Debug Map Data:", map_data)
         
         if map_data and map_data.get("last_clicked"):
