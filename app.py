@@ -7236,7 +7236,7 @@ with st.sidebar.container(border=True):
     """, unsafe_allow_html=True)
     show_temp_housing = st.toggle(
         "Show Temporary Housing",
-        value=True,
+        value=False,
         help="If checked, short-stay accommodations (Airbnb, VRBO, Hotels) will be plotted on the map."
     )
     default_start = datetime.date(2026, 8, 20)
