@@ -1828,11 +1828,11 @@ st.markdown("""
 
 # --- Dynamic Commute Anchor Setup (Defaults to Sony Pictures Imageworks) ---
 if "anchor_coords" not in st.session_state:
-    st.session_state.anchor_coords = (49.2805, -123.1130) # 349 W Georgia St (Sony Pictures Imageworks @ The Post)
+    st.session_state.anchor_coords = (49.27996, -123.11465) # 300 W Georgia St (Sony Pictures Imageworks @ The Post)
 if "anchor_name" not in st.session_state:
     st.session_state.anchor_name = "Sony Pictures Imageworks (The Post)"
 if "anchor_address_input" not in st.session_state:
-    st.session_state.anchor_address_input = "349 W Georgia St, Vancouver, BC"
+    st.session_state.anchor_address_input = "300 W Georgia St, Vancouver, BC"
 
 ANCHOR_COORDS = st.session_state.anchor_coords
 ANCHOR_NAME = st.session_state.anchor_name
@@ -6577,9 +6577,9 @@ def show_destination_setup_page():
         
         # Initialize values
         if "setup_address_input" not in st.session_state:
-            st.session_state.setup_address_input = "349 W Georgia St, Vancouver, BC"
+            st.session_state.setup_address_input = "300 W Georgia St, Vancouver, BC"
         if "setup_coords" not in st.session_state:
-            st.session_state.setup_coords = (49.2805, -123.1130)
+            st.session_state.setup_coords = (49.27996, -123.11465)
         if "setup_name" not in st.session_state:
             st.session_state.setup_name = "Sony Pictures Imageworks (The Post)"
             
@@ -6646,7 +6646,7 @@ def show_destination_setup_page():
         ).add_to(m)
         
         map_key = f"setup_map_canvas_{st.session_state.setup_coords[0]:.4f}_{st.session_state.setup_coords[1]:.4f}"
-        map_data = st_folium(m, height=420, width=None, key=map_key, returned_objects=["last_clicked"])
+        map_data = st_folium(m, height=420, width=550, key=map_key, returned_objects=["last_clicked"])
         st.write("Debug Map Data:", map_data)
         
         if map_data and map_data.get("last_clicked"):
