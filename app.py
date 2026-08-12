@@ -3442,22 +3442,75 @@ def generate_commute_routes(lat, lon, commute_modes):
             transit_to_stn = bus_to_stn_time
             leg1_is_bus = True
             
+        # Find target station closest to the anchor workplace
         if station_line == "Canada Line":
-            target_station = {"name": "Vancouver City Centre Station", "coords": (49.2798, -123.1156)}
-        elif station_line == "Expo Line":
-            target_station = {"name": "Granville Station", "coords": (49.2820, -123.1152)}
+            target_station = None
+            min_target_dist = 999
+            for stn in TRANSIT_STATIONS["Canada Line"]:
+                d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                if d < min_target_dist:
+                    min_target_dist = d
+                    target_station = stn
         elif station_line == "SeaBus":
-            target_station = {"name": "Waterfront SeaBus Terminal", "coords": (49.2859, -123.1118)}
+            target_station = None
+            min_target_dist = 999
+            for stn in TRANSIT_STATIONS["SeaBus"] if "SeaBus" in TRANSIT_STATIONS else [{"name": "Waterfront SeaBus Terminal", "coords": (49.2859, -123.1118)}, {"name": "Lonsdale Quay Terminal", "coords": (49.3090, -123.0809)}]:
+                d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                if d < min_target_dist:
+                    min_target_dist = d
+                    target_station = stn
+        elif station_line == "Expo Line":
+            min_e_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Expo Line"])
+            min_m_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Millennium Line"])
+            if min_m_dist < min_e_dist:
+                # Transfer to Millennium Line at Commercial-Broadway
+                target_station = None
+                min_target_dist = 999
+                for stn in TRANSIT_STATIONS["Millennium Line"]:
+                    d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                    if d < min_target_dist:
+                        min_target_dist = d
+                        target_station = stn
+            else:
+                target_station = None
+                min_target_dist = 999
+                for stn in TRANSIT_STATIONS["Expo Line"]:
+                    d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                    if d < min_target_dist:
+                        min_target_dist = d
+                        target_station = stn
         elif station_line == "Millennium Line":
-            target_station = {"name": "Granville Station", "coords": (49.2820, -123.1152)}
+            min_m_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Millennium Line"])
+            min_e_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Expo Line"])
+            if min_e_dist < min_m_dist:
+                # Transfer to Expo Line at Commercial-Broadway
+                target_station = None
+                min_target_dist = 999
+                for stn in TRANSIT_STATIONS["Expo Line"]:
+                    d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                    if d < min_target_dist:
+                        min_target_dist = d
+                        target_station = stn
+            else:
+                target_station = None
+                min_target_dist = 999
+                for stn in TRANSIT_STATIONS["Millennium Line"]:
+                    d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                    if d < min_target_dist:
+                        min_target_dist = d
+                        target_station = stn
             
         if target_station:
             if station_line == "SeaBus":
                 transit_ride_time = 12 + 7.5
-            elif station_line == "Millennium Line":
+            elif station_line == "Millennium Line" and target_station["name"] in [stn["name"] for stn in TRANSIT_STATIONS.get("Expo Line", [])]:
                 d_to_cb = haversine_distance(closest_station["coords"][0], closest_station["coords"][1], 49.2625, -123.0694)
-                d_cb_to_gr = haversine_distance(49.2625, -123.0694, 49.2820, -123.1152)
-                transit_ride_time = (d_to_cb + d_cb_to_gr) * 1.5 + 4 + 3
+                d_cb_to_target = haversine_distance(49.2625, -123.0694, target_station["coords"][0], target_station["coords"][1])
+                transit_ride_time = (d_to_cb + d_cb_to_target) * 1.5 + 4 + 3
+            elif station_line == "Expo Line" and target_station["name"] in [stn["name"] for stn in TRANSIT_STATIONS.get("Millennium Line", [])]:
+                d_to_cb = haversine_distance(closest_station["coords"][0], closest_station["coords"][1], 49.2625, -123.0694)
+                d_cb_to_target = haversine_distance(49.2625, -123.0694, target_station["coords"][0], target_station["coords"][1])
+                transit_ride_time = (d_to_cb + d_cb_to_target) * 1.5 + 4 + 3
             else:
                 train_dist = haversine_distance(closest_station["coords"][0], closest_station["coords"][1], target_station["coords"][0], target_station["coords"][1])
                 transit_ride_time = train_dist * 1.5 + 3
@@ -3731,60 +3784,53 @@ def get_isochrone_polygon(center_lat, center_lon, mode, scale=1.0):
         return Polygon(coords)
         
     elif mode == "Transit":
-        # Dynamic, highly precise SkyTrain and SeaBus corridor mapping matching actual geographic angles.
-        # Expo Line: angle 1.86 * pi (~5.85 rad). Stretches to Royal Oak: r_lat ~0.125, r_lon ~0.188.
-        # Canada Line: angle 1.51 * pi (~4.75 rad). Stretches to Bridgeport: r_lat ~0.100, r_lon ~0.068.
-        # Millennium Line: angle 1.97 * pi (~6.19 rad). Stretches to Brentwood Town Centre: r_lat ~0.035, r_lon ~0.178.
-        # SeaBus: angle 0.21 * pi (~0.66 rad). Stretches to Lonsdale Quay: r_lat ~0.032, r_lon ~0.042.
-        num_points = 36
-        angles = np.linspace(0, 2*np.pi, num_points, endpoint=False)
-        coords = []
-        for a in angles:
-            # Base bus footprint: ~2.8 km radius
-            r_lat = 0.025 * scale
-            r_lon = 0.038 * scale
-            
-            # Expo Line corridor (angle = 1.86 * pi, i.e., ~5.84 rad)
-            diff_expo = np.abs(a - 1.86 * np.pi)
-            if diff_expo > np.pi:
-                diff_expo = 2*np.pi - diff_expo
-            if diff_expo < np.pi/3.0:
-                factor = 1.0 - diff_expo / (np.pi/3.0)
-                r_lat = max(r_lat, (0.025 + 0.100 * factor) * scale)
-                r_lon = max(r_lon, (0.038 + 0.150 * factor) * scale)
+        # Find closest transit station to the anchor office
+        anchor_stn = None
+        anchor_line = None
+        min_d = 999
+        for line, stations in TRANSIT_STATIONS.items():
+            for stn in stations:
+                d = haversine_distance(center_lat, center_lon, stn["coords"][0], stn["coords"][1])
+                if d < min_d:
+                    min_d = d
+                    anchor_stn = stn
+                    anchor_line = line
+                    
+        # Define base pedestrian/bus coverage area around office
+        base_poly = Point(center_lon, center_lat).buffer(0.025 * scale)
+        polys_to_union = [base_poly]
+        
+        # If office is near a SkyTrain station, add rail corridor coverage
+        if anchor_stn and min_d <= 1.5:
+            # Add all stations on the same line that are within the travel time budget
+            for stn in TRANSIT_STATIONS[anchor_line]:
+                train_dist = haversine_distance(stn["coords"][0], stn["coords"][1], anchor_stn["coords"][0], anchor_stn["coords"][1])
+                ride_time = train_dist * 1.5 + 3.0
+                # Commute budget is 30 mins * scale
+                if ride_time <= 30.0 * scale:
+                    # Walk radius shrinks as commute budget is spent on train ride
+                    rem_budget = 1.0 - (ride_time / (30.0 * scale))
+                    if rem_budget > 0.05:
+                        r_walk = 0.015 * rem_budget * scale
+                        polys_to_union.append(Point(stn["coords"][1], stn["coords"][0]).buffer(r_walk))
+                        
+            # If the line is Expo or Millennium, also allow transferring between them at Commercial-Broadway
+            if anchor_line in ["Expo Line", "Millennium Line"]:
+                transfer_line = "Millennium Line" if anchor_line == "Expo Line" else "Expo Line"
+                cb_coords = (49.2625, -123.0694)
+                d_to_cb = haversine_distance(anchor_stn["coords"][0], anchor_stn["coords"][1], cb_coords[0], cb_coords[1])
+                ride_to_cb = d_to_cb * 1.5 + 3.0
                 
-            # Canada Line south corridor (angle = 1.51 * pi, i.e., ~4.74 rad)
-            diff_canada = np.abs(a - 1.51 * np.pi)
-            if diff_canada > np.pi:
-                diff_canada = 2*np.pi - diff_canada
-            if diff_canada < np.pi/5.0:
-                factor = 1.0 - diff_canada / (np.pi/5.0)
-                r_lat = max(r_lat, (0.025 + 0.075 * factor) * scale)
-                r_lon = max(r_lon, (0.038 + 0.030 * factor) * scale)
-                
-            # Millennium Line east corridor (angle = 1.97 * pi, i.e., ~6.19 rad)
-            diff_mill = np.abs(a - 1.97 * np.pi)
-            if diff_mill > np.pi:
-                diff_mill = 2*np.pi - diff_mill
-            if diff_mill < np.pi/6.0:
-                factor = 1.0 - diff_mill / (np.pi/6.0)
-                r_lat = max(r_lat, (0.025 + 0.010 * factor) * scale)
-                r_lon = max(r_lon, (0.038 + 0.140 * factor) * scale)
-                
-            # SeaBus north corridor (angle = 0.21 * pi, i.e., ~0.66 rad)
-            diff_seabus = np.abs(a - 0.21 * np.pi)
-            if diff_seabus > np.pi:
-                diff_seabus = 2*np.pi - diff_seabus
-            if diff_seabus < np.pi/12:
-                factor = 1.0 - diff_seabus / (np.pi/12)
-                r_lat = max(r_lat, (0.025 + 0.007 * factor) * scale)
-                r_lon = max(r_lon, (0.038 + 0.004 * factor) * scale)
-                
-            lat = center_lat + r_lat * np.sin(a)
-            lon = center_lon + r_lon * np.cos(a)
-            coords.append((lon, lat))
-        coords.append(coords[0])
-        return Polygon(coords)
+                for stn in TRANSIT_STATIONS[transfer_line]:
+                    train_dist = haversine_distance(stn["coords"][0], stn["coords"][1], cb_coords[0], cb_coords[1])
+                    ride_time = ride_to_cb + 4.0 + (train_dist * 1.5 + 3.0) # 4 min transfer penalty
+                    if ride_time <= 30.0 * scale:
+                        rem_budget = 1.0 - (ride_time / (30.0 * scale))
+                        if rem_budget > 0.05:
+                            r_walk = 0.015 * rem_budget * scale
+                            polys_to_union.append(Point(stn["coords"][1], stn["coords"][0]).buffer(r_walk))
+                            
+        return unary_union(polys_to_union)
 
 # --- Title-based Bedroom Parser ---
 def parse_bedrooms_from_title(title, default_val=3):
@@ -8277,24 +8323,75 @@ for item in all_current_listings:
             transit_to_stn = min(walk_to_stn, bus_to_stn)
             
             # target station near anchor
-            target_station = None
+            # Find target station closest to the anchor workplace
             if station_line == "Canada Line":
-                target_station = {"name": "Vancouver City Centre Station", "coords": (49.2798, -123.1156)}
-            elif station_line == "Expo Line":
-                target_station = {"name": "Granville Station", "coords": (49.2820, -123.1152)}
+                target_station = None
+                min_target_dist = 999
+                for stn in TRANSIT_STATIONS["Canada Line"]:
+                    d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                    if d < min_target_dist:
+                        min_target_dist = d
+                        target_station = stn
             elif station_line == "SeaBus":
-                target_station = {"name": "Waterfront SeaBus Terminal", "coords": (49.2859, -123.1118)}
+                target_station = None
+                min_target_dist = 999
+                for stn in TRANSIT_STATIONS["SeaBus"] if "SeaBus" in TRANSIT_STATIONS else [{"name": "Waterfront SeaBus Terminal", "coords": (49.2859, -123.1118)}, {"name": "Lonsdale Quay Terminal", "coords": (49.3090, -123.0809)}]:
+                    d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                    if d < min_target_dist:
+                        min_target_dist = d
+                        target_station = stn
+            elif station_line == "Expo Line":
+                min_e_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Expo Line"])
+                min_m_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Millennium Line"])
+                if min_m_dist < min_e_dist:
+                    # Transfer to Millennium Line at Commercial-Broadway
+                    target_station = None
+                    min_target_dist = 999
+                    for stn in TRANSIT_STATIONS["Millennium Line"]:
+                        d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                        if d < min_target_dist:
+                            min_target_dist = d
+                            target_station = stn
+                else:
+                    target_station = None
+                    min_target_dist = 999
+                    for stn in TRANSIT_STATIONS["Expo Line"]:
+                        d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                        if d < min_target_dist:
+                            min_target_dist = d
+                            target_station = stn
             elif station_line == "Millennium Line":
-                target_station = {"name": "Granville Station", "coords": (49.2820, -123.1152)}
+                min_m_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Millennium Line"])
+                min_e_dist = min(haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], s["coords"][0], s["coords"][1]) for s in TRANSIT_STATIONS["Expo Line"])
+                if min_e_dist < min_m_dist:
+                    # Transfer to Expo Line at Commercial-Broadway
+                    target_station = None
+                    min_target_dist = 999
+                    for stn in TRANSIT_STATIONS["Expo Line"]:
+                        d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                        if d < min_target_dist:
+                            min_target_dist = d
+                            target_station = stn
+                else:
+                    target_station = None
+                    min_target_dist = 999
+                    for stn in TRANSIT_STATIONS["Millennium Line"]:
+                        d = haversine_distance(ANCHOR_COORDS[0], ANCHOR_COORDS[1], stn["coords"][0], stn["coords"][1])
+                        if d < min_target_dist:
+                            min_target_dist = d
+                            target_station = stn
                 
             if target_station:
                 if station_line == "SeaBus":
-                    transit_ride_time = 12 + 7.5  # SeaBus crossing + headway
-                elif station_line == "Millennium Line":
-                    # Transfer via Commercial-Broadway
+                    transit_ride_time = 12 + 7.5
+                elif station_line == "Millennium Line" and target_station["name"] in [stn["name"] for stn in TRANSIT_STATIONS.get("Expo Line", [])]:
                     d_to_cb = haversine_distance(closest_station["coords"][0], closest_station["coords"][1], 49.2625, -123.0694)
-                    d_cb_to_gr = haversine_distance(49.2625, -123.0694, 49.2820, -123.1152)
-                    transit_ride_time = (d_to_cb + d_cb_to_gr) * 1.5 + 4 + 3
+                    d_cb_to_target = haversine_distance(49.2625, -123.0694, target_station["coords"][0], target_station["coords"][1])
+                    transit_ride_time = (d_to_cb + d_cb_to_target) * 1.5 + 4 + 3
+                elif station_line == "Expo Line" and target_station["name"] in [stn["name"] for stn in TRANSIT_STATIONS.get("Millennium Line", [])]:
+                    d_to_cb = haversine_distance(closest_station["coords"][0], closest_station["coords"][1], 49.2625, -123.0694)
+                    d_cb_to_target = haversine_distance(49.2625, -123.0694, target_station["coords"][0], target_station["coords"][1])
+                    transit_ride_time = (d_to_cb + d_cb_to_target) * 1.5 + 4 + 3
                 else:
                     train_dist = haversine_distance(closest_station["coords"][0], closest_station["coords"][1], target_station["coords"][0], target_station["coords"][1])
                     transit_ride_time = train_dist * 1.5 + 3
