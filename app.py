@@ -6673,9 +6673,7 @@ def show_destination_setup_page():
                 if st.session_state.get("temp_clicked_coords") != (lat, lon):
                     st.session_state.temp_clicked_coords = (lat, lon)
                     st.session_state.setup_coords = (lat, lon)
-                    with st.spinner("Reverse geocoding clicked location..."):
-                        addr = reverse_geocode_coords(lat, lon)
-                    st.session_state.setup_address_input = addr
+                    st.session_state.setup_address_input = f"{lat:.5f}, {lon:.5f}"
                     try:
                         with open(log_file, "a", encoding="utf-8") as f:
                             f.write(f"Updated setup_coords to {(lat, lon)}. Triggering rerun.\n")
