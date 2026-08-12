@@ -6643,6 +6643,7 @@ def show_destination_setup_page():
         ).add_to(m)
         
         map_data = st_folium(m, height=420, width=None, key="setup_map_canvas")
+        st.write("Debug Map Data:", map_data)
         
         if map_data and map_data.get("last_clicked"):
             lat = map_data["last_clicked"]["lat"]
