@@ -6651,15 +6651,42 @@ def show_destination_setup_page():
         if map_data and map_data.get("last_clicked"):
             lat = map_data["last_clicked"]["lat"]
             lon = map_data["last_clicked"]["lng"]
+            
+            # Log to file
+            log_dir = "C:/Users/jacob/.gemini/antigravity/brain/056e6f73-d31f-4bbd-83a9-67f6743858b4"
+            log_file = os.path.join(log_dir, "debug_clicks.log")
+            try:
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(f"{datetime.datetime.now()}: Click lat={lat}, lon={lon}\n")
+            except Exception as e:
+                pass
+                
             # bounds check to Metro Vancouver area
             if 49.0 <= lat <= 49.4 and -123.3 <= lon <= -122.5:
+                try:
+                    with open(log_file, "a", encoding="utf-8") as f:
+                        f.write(f"Passed bounds. temp_clicked_coords={st.session_state.get('temp_clicked_coords')}\n")
+                except Exception:
+                    pass
+                    
                 if st.session_state.get("temp_clicked_coords") != (lat, lon):
                     st.session_state.temp_clicked_coords = (lat, lon)
                     st.session_state.setup_coords = (lat, lon)
                     with st.spinner("Reverse geocoding clicked location..."):
                         addr = reverse_geocode_coords(lat, lon)
                     st.session_state.setup_address_input = addr
+                    try:
+                        with open(log_file, "a", encoding="utf-8") as f:
+                            f.write(f"Updated setup_coords to {(lat, lon)}. Triggering rerun.\n")
+                    except Exception:
+                        pass
                     st.rerun()
+            else:
+                try:
+                    with open(log_file, "a", encoding="utf-8") as f:
+                        f.write(f"Failed bounds check.\n")
+                except Exception:
+                    pass
 
 # --- Destination setup flow check ---
 if "destination_set" not in st.session_state:
