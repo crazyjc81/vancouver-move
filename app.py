@@ -34,27 +34,35 @@ def extract_polygons(geom):
 
 
 # --- Nominatim Geocoding API for Custom Inputs ---
-def geocode_address(address):
+@st.cache_data(show_spinner=False, ttl=86400)
+def _geocode_address_cached(address):
     """
-    Geocodes a custom address via the free OpenStreetMap Nominatim API.
-    Bounds searches to Metro Vancouver region.
+    Core geocoding function cached by Streamlit.
     """
     query = urllib.parse.quote(address)
     url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1&bounded=1&viewbox=-123.3,49.35,-122.75,49.0"
     headers = {
         'User-Agent': 'VancouverMoveRelocationMatrix/1.0 (crazyjc@antigravity.ai)'
     }
-    
     req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=5) as response:
+        data = json.loads(response.read().decode('utf-8'))
+        if data:
+            lat = float(data[0]['lat'])
+            lon = float(data[0]['lon'])
+            return lat, lon
+    return None
+
+def geocode_address(address, show_error=False):
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            if data:
-                lat = float(data[0]['lat'])
-                lon = float(data[0]['lon'])
-                return lat, lon
+        if not show_error:
+            time.sleep(0.5) # rate limit background calls
+        return _geocode_address_cached(address)
     except Exception as e:
-        st.error(f"Geocoding error: {e}")
+        if show_error:
+            st.error(f"Geocoding error: {e}")
+        else:
+            print(f"Background geocoding warning: {address} -> {e}")
     return None
 
 
@@ -6058,30 +6066,6 @@ def scrape_hollyburn_vancouver(min_price=2000, max_price=5000, min_beds=2, max_b
     return filtered_cache
 
 
-# --- Nominatim Geocoding API for Custom Inputs ---
-def geocode_address(address):
-    """
-    Geocodes a custom address via the free OpenStreetMap Nominatim API.
-    Bounds searches to Metro Vancouver region.
-    """
-    query = urllib.parse.quote(address)
-    url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=1&bounded=1&viewbox=-123.3,49.35,-122.75,49.0"
-    headers = {
-        'User-Agent': 'VancouverMoveRelocationMatrix/1.0 (crazyjc@antigravity.ai)'
-    }
-    
-    req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            if data:
-                lat = float(data[0]['lat'])
-                lon = float(data[0]['lon'])
-                return lat, lon
-    except Exception as e:
-        st.error(f"Geocoding error: {e}")
-    return None
-
 def normalize_listing(item, is_fallback=True):
     item_copy = dict(item)
     item_copy["is_cache_fallback"] = is_fallback
@@ -6608,7 +6592,7 @@ def show_destination_setup_page():
             st.session_state.setup_address_input = addr_input
             if addr_input.strip():
                 with st.spinner("Geocoding address..."):
-                    coords = geocode_address(addr_input)
+                    coords = geocode_address(addr_input, show_error=True)
                 if coords:
                     st.session_state.setup_coords = coords
                     st.rerun()
@@ -7149,7 +7133,7 @@ with st.sidebar.container(border=True):
     if button_clicked or addr_changed:
         st.session_state.last_geocoded_address = new_anchor_addr
         if new_anchor_addr.strip():
-            coords = geocode_address(new_anchor_addr)
+            coords = geocode_address(new_anchor_addr, show_error=True)
             if coords:
                 st.session_state.anchor_coords = coords
                 st.session_state.anchor_name = new_anchor_name
@@ -7600,7 +7584,7 @@ if st.sidebar.button("⚡ Extract & Add Listing", key="add_custom_btn"):
                 addr = extracted.get("address")
                 if addr:
                     with st.spinner(f"Geocoding address: {addr}..."):
-                        coords = geocode_address(addr)
+                        coords = geocode_address(addr, show_error=True)
                         if coords:
                             new_listing = {
                                 "source": "Custom Input",
