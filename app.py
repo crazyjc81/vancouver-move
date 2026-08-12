@@ -58,6 +58,26 @@ def geocode_address(address):
     return None
 
 
+def reverse_geocode_coords(lat, lon):
+    """
+    Reverse geocodes coordinates via OSM Nominatim API.
+    """
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+    headers = {
+        'User-Agent': 'VancouverMoveRelocationMatrix/1.0 (crazyjc@antigravity.ai)'
+    }
+    
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            if data:
+                return data.get('display_name', f"{lat:.4f}, {lon:.4f}")
+    except Exception as e:
+        pass
+    return f"{lat:.4f}, {lon:.4f}"
+
+
 # --- Persistent Listings & Transit Stops Helper Functions ---
 CUSTOM_LISTINGS_FILE = "custom_listings.json"
 
@@ -6497,6 +6517,152 @@ def fetch_descriptions_for_candidates(candidates):
 
 
 # --- Main App Execution State ---
+def show_destination_setup_page():
+    # Setup custom styling
+    st.markdown("""
+    <style>
+    /* Premium Setup Page Styles */
+    .setup-card {
+        background: rgba(30, 41, 59, 0.45);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 24px;
+        padding: 2.5rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 
+                    0 0 50px rgba(139, 92, 246, 0.1);
+        margin-bottom: 2rem;
+    }
+    .setup-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 2.4rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+    .setup-subtitle {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.05rem;
+        color: #94a3b8;
+        margin-bottom: 2rem;
+    }
+    .setup-instructions {
+        background: rgba(139, 92, 246, 0.08);
+        border-left: 4px solid #8b5cf6;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        color: #ddd6fe;
+        font-size: 0.95rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="setup-card">
+        <h1 class="setup-title">🏢 Commute Destination Setup</h1>
+        <p class="setup-subtitle">Before analyzing rental listings and generating spatial routing isochrones, define your workplace or primary transit node in Metro Vancouver.</p>
+        <div class="setup-instructions">
+            📍 <b>Interactive Setup:</b> Type your destination name and address below, or <b>directly click on the map</b> on the right to drop a location pin. The system will auto-geocode and resolve travel profiles.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_left, col_right = st.columns([1.1, 1.4])
+    
+    with col_left:
+        st.markdown("### ⚙️ Destination Parameters")
+        
+        # Initialize values
+        if "setup_address_input" not in st.session_state:
+            st.session_state.setup_address_input = "349 W Georgia St, Vancouver, BC"
+        if "setup_coords" not in st.session_state:
+            st.session_state.setup_coords = (49.2805, -123.1130)
+        if "setup_name" not in st.session_state:
+            st.session_state.setup_name = "Sony Pictures Imageworks (The Post)"
+            
+        name_input = st.text_input(
+            "Destination Name",
+            value=st.session_state.setup_name,
+            key="setup_name_widget",
+            help="Name of your workplace or commute hub."
+        )
+        if name_input != st.session_state.setup_name:
+            st.session_state.setup_name = name_input
+            
+        addr_input = st.text_input(
+            "Destination Address",
+            value=st.session_state.setup_address_input,
+            key="setup_address_widget",
+            help="Address coordinates will be resolved from this input."
+        )
+        if addr_input != st.session_state.setup_address_input:
+            st.session_state.setup_address_input = addr_input
+            if addr_input.strip():
+                with st.spinner("Geocoding address..."):
+                    coords = geocode_address(addr_input)
+                if coords:
+                    st.session_state.setup_coords = coords
+                    st.rerun()
+                else:
+                    st.error("Address not found. Click on the map to pin coords directly.")
+                    
+        st.markdown(f"""
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 1rem; margin-top: 1.5rem; margin-bottom: 1.5rem;">
+            <div style="font-size: 0.85rem; color: #94a3b8;">RESOLVED COORDINATES</div>
+            <div style="font-size: 1.1rem; font-weight: 600; color: #10b981;">{st.session_state.setup_coords[0]:.5f}, {st.session_state.setup_coords[1]:.5f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🚀 Confirm Destination & Search Rentals", use_container_width=True, type="primary"):
+            st.session_state.anchor_coords = st.session_state.setup_coords
+            st.session_state.anchor_name = st.session_state.setup_name
+            st.session_state.anchor_address_input = st.session_state.setup_address_input
+            st.session_state.destination_set = True
+            
+            # Synchronize sidebar values
+            st.session_state.workplace_name_input = st.session_state.setup_name
+            st.session_state.workplace_address_input = st.session_state.setup_address_input
+            st.session_state.last_geocoded_address = st.session_state.setup_address_input
+            st.rerun()
+            
+    with col_right:
+        st.markdown("### 🗺️ Visual Pin Placement")
+        # Render interactive map centered at current coordinates
+        from streamlit_folium import st_folium
+        m = folium.Map(location=st.session_state.setup_coords, zoom_start=13, tiles="cartodbpositron")
+        
+        # Add a nice styled marker for the selected setup coords
+        folium.Marker(
+            location=st.session_state.setup_coords,
+            popup=st.session_state.setup_name,
+            tooltip="Drop Pin Target",
+            icon=folium.Icon(color="purple", icon="briefcase", prefix="fa")
+        ).add_to(m)
+        
+        map_data = st_folium(m, height=420, width=None, key="setup_map_canvas")
+        
+        if map_data and map_data.get("last_clicked"):
+            lat = map_data["last_clicked"]["lat"]
+            lon = map_data["last_clicked"]["lng"]
+            # bounds check to Metro Vancouver area
+            if 49.0 <= lat <= 49.4 and -123.3 <= lon <= -122.5:
+                if st.session_state.get("temp_clicked_coords") != (lat, lon):
+                    st.session_state.temp_clicked_coords = (lat, lon)
+                    st.session_state.setup_coords = (lat, lon)
+                    with st.spinner("Reverse geocoding clicked location..."):
+                        addr = reverse_geocode_coords(lat, lon)
+                    st.session_state.setup_address_input = addr
+                    st.rerun()
+
+# --- Destination setup flow check ---
+if "destination_set" not in st.session_state:
+    show_destination_setup_page()
+    st.stop()
+
+
 if 'listings_df' not in st.session_state:
     # First load uses Cached listings
     combined = []
@@ -8134,22 +8300,13 @@ for item in all_current_listings:
         })
 
 # Deduplicate/limit cached fallback listings to avoid cluttering the map.
-# If a source only has fallback listings, we only keep the first one in filtered_listings.
-# If a source has any live listings, we discard fallback listings for that source.
+# If any live listings exist, discard all fallback listings.
+# If only fallback listings exist, keep only the first fallback listing in total (plus the inspected target if it is a fallback).
 deduped_listings = []
-source_has_live = {}
+has_any_live = any(not item.get("is_cache_fallback", False) for item in filtered_listings)
 
-# First, check which sources have live listings
+fallback_count = 0
 for item in filtered_listings:
-    src = item["source"]
-    is_fallback = item.get("is_cache_fallback", False)
-    if not is_fallback:
-        source_has_live[src] = True
-
-# Next, filter out excess fallbacks: keep only the first fallback per source if that source has no live listings.
-fallback_sources_seen = set()
-for item in filtered_listings:
-    src = item["source"]
     is_fallback = item.get("is_cache_fallback", False)
     
     # Check if this item is the currently inspected target
@@ -8159,15 +8316,17 @@ for item in filtered_listings:
     if is_inspected:
         # Always keep the inspected item
         deduped_listings.append(item)
-    elif is_fallback:
-        if not source_has_live.get(src, False):
-            if src not in fallback_sources_seen:
-                deduped_listings.append(item)
-                fallback_sources_seen.add(src)
-        # If source has live listings, we skip fallbacks entirely
-    else:
+        if is_fallback:
+            fallback_count += 1
+    elif not is_fallback:
         # Live listing, always keep
         deduped_listings.append(item)
+    else:
+        # Fallback listing
+        if not has_any_live:
+            if fallback_count == 0:
+                deduped_listings.append(item)
+                fallback_count += 1
 
 filtered_listings = deduped_listings
 
@@ -9488,6 +9647,7 @@ with col_map:
             localStorage.removeItem('vancouver_map_center');
             localStorage.removeItem('vancouver_map_zoom');
             localStorage.setItem('vancouver_map_anchor', current_anchor_str);
+            map_obj.setView(anchor_coords, 12, {{animate: true}});
         }} else {{
             var saved_center = localStorage.getItem('vancouver_map_center');
             var saved_zoom = localStorage.getItem('vancouver_map_zoom');
