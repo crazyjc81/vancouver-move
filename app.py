@@ -2661,8 +2661,11 @@ SCHOOLS_DATA.update(MIDDLE_SCHOOLS)
 for s_name, s_info in SCHOOLS_DATA.items():
     board = s_info["board"]
     if "SD39 Vancouver" in board:
-        slug = s_name.lower().replace(" elementary", "").replace(" secondary", "").replace("dr. ", "dr-").replace("j.w. ", "jw-").replace(" ", "-").replace(".", "")
-        s_info["url"] = f"https://www.vsb.bc.ca/{slug}"
+        if "demo" in s_name.lower():
+            s_info["url"] = "https://www.vsb.bc.ca/"
+        else:
+            slug = s_name.lower().replace(" elementary", "").replace(" secondary", "").replace("dr. ", "dr-").replace("j.w. ", "jw-").replace(" ", "-").replace(".", "")
+            s_info["url"] = f"https://www.vsb.bc.ca/schools/{slug}"
     elif "SD41 Burnaby" in board:
         slug = s_name.lower().replace(" community", "").replace(" elementary", "").replace(" secondary", "").replace(" school", "").replace(" ", "").replace("-", "")
         s_info["url"] = f"https://{slug}.burnabyschools.ca"
