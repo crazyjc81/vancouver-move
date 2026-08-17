@@ -3991,6 +3991,59 @@ def get_available_date_display(item):
             
     return av_str
 
+@st.cache_data(show_spinner=False, ttl=86400)
+def fetch_craigslist_details(url):
+    """
+    Fetches Craigslist listing details (description text and image gallery) on the server side
+    to bypass browser-based IP block pages.
+    """
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    try:
+        from curl_cffi import requests as cffi_requests
+        r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=8)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, 'html.parser')
+            
+            # Extract posting body text
+            post_body = soup.find('section', id='postingbody')
+            body_text = ""
+            if post_body:
+                # Remove warning text if present
+                body_text = post_body.text.replace("QR Code Link to This Post", "").strip()
+                
+            # Extract image URLs
+            img_urls = []
+            # Look in gallery
+            gallery = soup.find('div', class_='gallery')
+            if gallery:
+                for img in gallery.find_all('img'):
+                    src = img.get('src') or img.get('data-src')
+                    if src and "images.craigslist.org" in src:
+                        img_urls.append(src)
+            else:
+                # Fallback: find all images matching craigslist images domain
+                for img in soup.find_all('img'):
+                    src = img.get('src') or img.get('data-src')
+                    if src and "images.craigslist.org" in src:
+                        # Convert thumbnail to larger size
+                        if "_50x50c" in src:
+                            src = src.replace("_50x50c", "_600x450")
+                        img_urls.append(src)
+                        
+            # Remove duplicates while preserving order
+            seen = set()
+            img_urls = [x for x in img_urls if not (x in seen or seen.add(x))]
+            
+            return {
+                "body": body_text,
+                "images": img_urls[:12]
+            }
+    except Exception as e:
+        print(f"Error fetching Craigslist details: {e}")
+    return None
+
 # --- Stage 3 & Live Scraper: Craigslist Data Collector ---
 def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_beds=3):
     """
@@ -10184,6 +10237,24 @@ with col_details:
 </div>
 </div>"""
                 st.markdown(card_html, unsafe_allow_html=True)
+                
+                # Fetch and display Craigslist listing body and images on the server side to bypass client-side IP blocks
+                if "craigslist" in item["source"].lower():
+                    with st.spinner("Fetching original description and photos..."):
+                        cl_details = fetch_craigslist_details(item["url"])
+                    
+                    if cl_details:
+                        if cl_details["images"]:
+                            img_tags = "".join([f'<img src="{src}" style="height: 140px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1);">' for src in cl_details["images"]])
+                            st.markdown(f"""
+                            <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-top: 0.8rem; margin-bottom: 0.8rem; scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
+                                {img_tags}
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                        if cl_details["body"]:
+                            with st.expander("📖 Original Description", expanded=True):
+                                st.markdown(f'<div style="font-size:0.9rem; line-height:1.5; color:#cbd5e1; white-space:pre-wrap; font-family:inherit;">{cl_details["body"]}</div>', unsafe_allow_html=True)
                 
         elif t_type == "temp_housing":
             item = next((x for x in filtered_temp_housing if x["name"] == t_key), None)
