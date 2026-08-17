@@ -13,6 +13,17 @@ from shapely.geometry import Polygon, Point
 from shapely.ops import unary_union
 import time
 import datetime
+def load_env_variables():
+    import os
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                if "=" in line and not line.startswith("#"):
+                    key, val = line.strip().split("=", 1)
+                    os.environ[key.strip()] = val.strip()
+
+load_env_variables()
 
 def extract_polygons(geom):
     """
@@ -4001,10 +4012,23 @@ def fetch_craigslist_details(url):
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     try:
-        from curl_cffi import requests as cffi_requests
-        r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=8)
-        if r.status_code == 200:
-            soup = BeautifulSoup(r.text, 'html.parser')
+        scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
+        html = ""
+        if scraperapi_key:
+            import urllib.parse
+            import requests
+            proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
+            r = requests.get(proxy_url, timeout=15)
+            if r.status_code == 200:
+                html = r.text
+        else:
+            from curl_cffi import requests as cffi_requests
+            r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=8)
+            if r.status_code == 200:
+                html = r.text
+                
+        if html:
+            soup = BeautifulSoup(html, 'html.parser')
             
             # Extract posting body text
             post_body = soup.find('section', id='postingbody')
@@ -4060,8 +4084,16 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
         import random
         time.sleep(random.uniform(1.5, 3.5))
         
-        from curl_cffi import requests as cffi_requests
-        r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=8)
+        scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
+        if scraperapi_key:
+            import urllib.parse
+            import requests
+            proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
+            r = requests.get(proxy_url, timeout=15)
+        else:
+            from curl_cffi import requests as cffi_requests
+            r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=8)
+            
         if r.status_code != 200:
             raise Exception(f"HTTP Error {r.status_code}")
         if r.status_code == 200:
@@ -4082,6 +4114,11 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
                 price_str = price_div.text.strip() if price_div else "$0"
                 loc = loc_div.text.strip() if loc_div else "Vancouver, BC"
                 href = a_tag.get('href') if a_tag else "https://vancouver.craigslist.org/search/apa"
+                
+                # Make relative paths absolute
+                if href and not href.startswith("http"):
+                    import urllib.parse
+                    href = urllib.parse.urljoin("https://vancouver.craigslist.org", href)
                 
                 # Parse rent price integer
                 price = int(re.sub(r'[^\d]', '', price_str)) if price_str != "$0" else 3000
