@@ -7206,7 +7206,7 @@ if "first_run_done" not in st.session_state:
 # --- Sidebar Controls ---
 
 # Travel Blob Controller
-with st.sidebar.expander("🏃 Stage 1: Commute Blob Settings", expanded=True):
+with st.sidebar.expander("🏃 Commute Blob Settings", expanded=True):
     commute_modes = st.multiselect(
         "Select Commute Modes to Display",
         options=["Transit", "Cycling", "Walking"],
@@ -7227,59 +7227,17 @@ with st.sidebar.expander("🏃 Stage 1: Commute Blob Settings", expanded=True):
     )
 max_commute_slider = max_commute_mins / 30.0
 
-# Stage 2: Temporary Housing Search (Purple)
-with st.sidebar.expander("🏨 Stage 2: Temporary Housing", expanded=False):
-    show_temp_housing = st.toggle(
-        "Show Temporary Housing",
-        value=False,
-        help="If checked, short-stay accommodations (Airbnb, VRBO, Hotels) will be plotted on the map."
-    )
-    default_start = datetime.date(2026, 8, 20)
-    default_end = datetime.date(2026, 9, 1)
-    stay_dates = st.date_input(
-        "Temporary Stay Dates",
-        value=(default_start, default_end),
-        help="Select the start and end dates for your temporary stay."
-    )
-    if isinstance(stay_dates, tuple) and len(stay_dates) == 2:
-        stay_days = max(1, (stay_dates[1] - stay_dates[0]).days)
-    else:
-        stay_days = 1
-    guest_count = st.slider(
-        "Number of People / Guests",
-        min_value=1,
-        max_value=8,
-        value=4,
-        step=1,
-        help="Filter short-stays that can accommodate at least this number of guests."
-    )
-    stay_types = st.multiselect(
-        "Select Stay Types",
-        options=["Hotel", "Airbnb", "VRBO", "Corporate Stay", "Furnished Rental", "Sublet"],
-        default=["Hotel", "Airbnb", "VRBO", "Corporate Stay", "Furnished Rental", "Sublet"],
-        help="Filter short-stay options by booking channel/type."
-    )
-    max_nightly_rate = st.slider(
-        "Max Nightly Rate (CAD)",
-        min_value=50,
-        max_value=1000,
-        value=250,
-        step=10,
-        help="Filter short stays below this price per night."
-    )
-    include_furnished_rentals = st.toggle(
-        "Include Furnished & Sublet Rentals",
-        value=True,
-        help="If checked, monthly furnished rental properties and sublets from Rent It Furnished and Craigslist Sublets will be included as temporary stay options, using an estimated nightly rate (Monthly Rent / 30)."
-    )
-    restrict_temp_housing_to_commute = st.checkbox(
-        "Restrict Stays to Commute Area",
-        value=False,
-        help="If checked, only temporary housing options physically located within your active commute area are rendered."
-    )
+# Pre-defined mock values for removed Temporary Housing functionality
+show_temp_housing = False
+stay_dates = None
+guest_count = 1
+stay_types = []
+max_nightly_rate = 250
+include_furnished_rentals = False
+restrict_temp_housing_to_commute = False
 
 # School Board Controller (Stage 3)
-with st.sidebar.expander("🎓 Stage 3: School Catchment Filter", expanded=False):
+with st.sidebar.expander("🎓 School Catchment Filter", expanded=False):
     show_schools = st.toggle(
         "Show Schools",
         value=True,
@@ -7378,7 +7336,7 @@ with st.sidebar.expander("🎓 Stage 3: School Catchment Filter", expanded=False
     )
 
 # Housing Cost Filter
-with st.sidebar.expander("🏠 Stage 4: Financial Budget & Sources", expanded=True):
+with st.sidebar.expander("🏠 Financial Budget & Sources", expanded=True):
     show_rentals = st.toggle(
         "Show Rentals",
         value=True,
@@ -7543,7 +7501,7 @@ with st.sidebar.expander("🤝 Social Services Density Overlay", expanded=False)
     )
 
 # Stage 6: Public Safety & Incident Overlay
-with st.sidebar.expander("⚠️ Stage 6: Public Safety Incidents", expanded=False):
+with st.sidebar.expander("⚠️ Public Safety Incidents", expanded=False):
     show_crime_incidents = st.toggle(
         "Show Crime Incidents Overlay",
         value=False,
