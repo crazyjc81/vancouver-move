@@ -1529,6 +1529,11 @@ st.markdown("""
 
     /* Mobile Responsive Overrides */
     @media (max-width: 768px) {
+        /* Push the entire webpage down on mobile to clear safe-areas, notches, and browser address bars */
+        .stApp {
+            margin-top: 50px !important;
+        }
+        
         /* Show the header on mobile so they can toggle the sidebar! */
         header[data-testid="stHeader"], header[class*="stHeader"] {
             display: flex !important;
