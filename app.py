@@ -1509,6 +1509,21 @@ st.markdown("""
         margin: 0 !important;
     }
     
+    /* Premium dark themed styling for sidebar expanders */
+    div[data-testid="stExpander"] {
+        background-color: rgba(30, 41, 59, 0.4) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        border-radius: 8px !important;
+        margin-bottom: 0.6rem !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+    }
+    div[data-testid="stExpander"] summary {
+        background-color: rgba(30, 41, 59, 0.6) !important;
+        border-radius: 8px 8px 0 0 !important;
+        padding: 10px 14px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
+    }
+    
     div[data-testid="element-container"]:has(iframe) {
         margin: 0 !important;
         padding: 0 !important;
@@ -7180,67 +7195,20 @@ if "first_run_done" not in st.session_state:
 # --- Sidebar Controls ---
 st.sidebar.markdown("## 🧭 Controller Matrix")
 
-# Commute Destination Configuration (Workplace)
-with st.sidebar.container(border=True):
-    st.markdown("""
-    <div class="stage-header" style="background: linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(30, 41, 59, 0.05) 100%); border-left: 4px solid #f43f5e; color: #fecdd3; margin-bottom: 8px;">
-        <span class="stage-icon">🏢</span> Commute Destination
-    </div>
-    """, unsafe_allow_html=True)
-    
-    new_anchor_name = st.text_input(
-        "Destination Name",
-        value=st.session_state.anchor_name,
-        key="workplace_name_input",
-        help="Name of your workplace or commute destination."
-    )
-    
-    new_anchor_addr = st.text_input(
-        "Destination Address",
-        value=st.session_state.anchor_address_input,
-        key="workplace_address_input",
-        help="Address to calculate commutes from."
-    )
-    
-    # Initialize last_geocoded_address if not present
-    if "last_geocoded_address" not in st.session_state:
-        st.session_state.last_geocoded_address = st.session_state.anchor_address_input
+# Reset/Change Destination Setup
+if st.sidebar.button("🔄 Change Destination Location", key="reset_destination_btn", use_container_width=True):
+    st.session_state.destination_set = False
+    # Clear map caches
+    if "m_cached" in st.session_state:
+        del st.session_state["m_cached"]
+    if "map_filters_stable" in st.session_state:
+        del st.session_state["map_filters_stable"]
+    st.rerun()
 
-    addr_changed = (new_anchor_addr != st.session_state.last_geocoded_address)
-    name_changed = (new_anchor_name != st.session_state.anchor_name)
-    button_clicked = st.button("🔄 Update Destination", key="update_anchor_btn", use_container_width=True)
-    
-    if button_clicked or addr_changed:
-        st.session_state.last_geocoded_address = new_anchor_addr
-        if new_anchor_addr.strip():
-            coords = geocode_address(new_anchor_addr, show_error=True)
-            if coords:
-                st.session_state.anchor_coords = coords
-                st.session_state.anchor_name = new_anchor_name
-                st.session_state.anchor_address_input = new_anchor_addr
-                # Clear map cache immediately
-                if "m_cached" in st.session_state:
-                    del st.session_state["m_cached"]
-                if "map_filters_stable" in st.session_state:
-                    del st.session_state["map_filters_stable"]
-                st.success(f"Updated destination to {new_anchor_name}!")
-                st.rerun()
-            else:
-                st.error("Could not find coordinates for this address. Please try another one.")
-        else:
-            st.warning("Please enter an address.")
-    elif name_changed:
-        st.session_state.anchor_name = new_anchor_name
-        st.rerun()
-
+st.sidebar.markdown("---")
 
 # Travel Blob Controller
-with st.sidebar.container(border=True):
-    st.markdown("""
-    <div class="stage-header stage-1-header">
-        <span class="stage-icon">🏃</span> Stage 1: Commute Blob Settings
-    </div>
-    """, unsafe_allow_html=True)
+with st.sidebar.expander("🏃 Stage 1: Commute Blob Settings", expanded=True):
     commute_modes = st.multiselect(
         "Select Commute Modes to Display",
         options=["Transit", "Cycling", "Walking"],
@@ -7262,12 +7230,7 @@ with st.sidebar.container(border=True):
 max_commute_slider = max_commute_mins / 30.0
 
 # Stage 2: Temporary Housing Search (Purple)
-with st.sidebar.container(border=True):
-    st.markdown("""
-    <div class="stage-header stage-2-header">
-        <span class="stage-icon">🏨</span> Stage 2: Temporary Housing
-    </div>
-    """, unsafe_allow_html=True)
+with st.sidebar.expander("🏨 Stage 2: Temporary Housing", expanded=False):
     show_temp_housing = st.toggle(
         "Show Temporary Housing",
         value=False,
@@ -7318,12 +7281,7 @@ with st.sidebar.container(border=True):
     )
 
 # School Board Controller (Stage 3)
-with st.sidebar.container(border=True):
-    st.markdown("""
-    <div class="stage-header stage-3-header">
-        <span class="stage-icon">🎓</span> Stage 3: School Catchment Filter
-    </div>
-    """, unsafe_allow_html=True)
+with st.sidebar.expander("🎓 Stage 3: School Catchment Filter", expanded=False):
     show_schools = st.toggle(
         "Show Schools",
         value=True,
@@ -7422,12 +7380,7 @@ with st.sidebar.container(border=True):
     )
 
 # Housing Cost Filter
-with st.sidebar.container(border=True):
-    st.markdown("""
-    <div class="stage-header stage-4-header">
-        <span class="stage-icon">🏠</span> Stage 4: Financial Budget & Sources
-    </div>
-    """, unsafe_allow_html=True)
+with st.sidebar.expander("🏠 Stage 4: Financial Budget & Sources", expanded=True):
     show_rentals = st.toggle(
         "Show Rentals",
         value=True,
@@ -7584,12 +7537,7 @@ with st.sidebar.container(border=True):
     house_restrict_status = st.empty()
 
 # Stage 5: Social Services Overlay
-with st.sidebar.container(border=True):
-    st.markdown("""
-    <div class="stage-header" style="border-left: 4px solid #e74c3c; background: linear-gradient(90deg, rgba(231, 76, 60, 0.1) 0%, rgba(0,0,0,0) 100%);">
-        <span class="stage-icon">🤝</span> Social Services Density Overlay
-    </div>
-    """, unsafe_allow_html=True)
+with st.sidebar.expander("🤝 Social Services Density Overlay", expanded=False):
     show_social_resources = st.toggle(
         "Show Social Services Density Zone",
         value=True,
@@ -7597,13 +7545,7 @@ with st.sidebar.container(border=True):
     )
 
 # Stage 6: Public Safety & Incident Overlay
-with st.sidebar.container(border=True):
-    st.markdown("""
-    <div class="stage-header" style="border-left: 4px solid #f1c40f; background: linear-gradient(90deg, rgba(241, 196, 15, 0.1) 0%, rgba(0,0,0,0) 100%);">
-        <span class="stage-icon">⚠️</span> Stage 6: Public Safety Incidents
-    </div>
-    """, unsafe_allow_html=True)
-    
+with st.sidebar.expander("⚠️ Stage 6: Public Safety Incidents", expanded=False):
     show_crime_incidents = st.toggle(
         "Show Crime Incidents Overlay",
         value=False,
