@@ -4012,9 +4012,24 @@ def fetch_craigslist_details(url):
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     try:
+        webshare_user = os.environ.get("WEBSHARE_USERNAME")
+        webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
+        webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
+        webshare_port = os.environ.get("WEBSHARE_PORT", "80")
+        
         scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
         html = ""
-        if scraperapi_key:
+        
+        if webshare_user and webshare_pass:
+            proxies = {
+                "http": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}",
+                "https": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}"
+            }
+            from curl_cffi import requests as cffi_requests
+            r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=12)
+            if r.status_code == 200:
+                html = r.text
+        elif scraperapi_key:
             import urllib.parse
             import requests
             proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
@@ -4084,8 +4099,20 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
         import random
         time.sleep(random.uniform(1.5, 3.5))
         
+        webshare_user = os.environ.get("WEBSHARE_USERNAME")
+        webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
+        webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
+        webshare_port = os.environ.get("WEBSHARE_PORT", "80")
+        
         scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
-        if scraperapi_key:
+        if webshare_user and webshare_pass:
+            proxies = {
+                "http": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}",
+                "https": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}"
+            }
+            from curl_cffi import requests as cffi_requests
+            r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=12)
+        elif scraperapi_key:
             import urllib.parse
             import requests
             proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
@@ -6955,8 +6982,22 @@ def fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b):
         def fetch_single(url, source):
             description = ""
             try:
+                webshare_user = os.environ.get("WEBSHARE_USERNAME")
+                webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
+                webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
+                webshare_port = os.environ.get("WEBSHARE_PORT", "80")
+                
                 scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
-                if scraperapi_key:
+                html = ""
+                
+                if webshare_user and webshare_pass:
+                    proxies = {
+                        "http": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}",
+                        "https": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}"
+                    }
+                    r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=5)
+                    html = r.text if r.status_code == 200 else ""
+                elif scraperapi_key:
                     import urllib.parse
                     import requests
                     proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
