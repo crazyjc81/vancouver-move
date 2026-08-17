@@ -10256,6 +10256,10 @@ with col_details:
 🛏️ {item["bedrooms"]} Bed &nbsp;&nbsp; 🚿 {item["bathrooms"]} Bath
 </div>
 </div>
+<div style="margin-top: 0.6rem; display: flex; gap: 10px;">
+<a href="https://www.google.com/maps/search/?api=1&query={item['lat']},{item['lon']}" target="_blank" style="text-decoration:none; background:#2D3748; color:#fff; font-size:0.82rem; font-weight:600; padding:8px 12px; border-radius:6px; display: inline-block; border: 1px solid rgba(255,255,255,0.1); text-align: center; flex: 1;">Google Maps 🗺️</a>
+<a href="{item["url"]}" target="_blank" style="text-decoration:none; background:#4D96FF; color:#fff; font-size:0.82rem; font-weight:600; padding:8px 12px; border-radius:6px; display: inline-block; text-align: center; flex: 1;">View Listing Page 🔗</a>
+</div>
 <div style="margin-top: 0.6rem; background: rgba(0,0,0,0.18); padding: 10px; border-radius:6px; font-size:0.85rem; border: 1px solid rgba(255,255,255,0.05);">
 {school_block_html}
 🧸 <b>OSC Childcare:</b> <span style="color:#A5C9CA;">{item["childcare"]}</span>
@@ -10265,11 +10269,6 @@ with col_details:
 <div style='margin-top: 0.8rem; padding: 10px; background: rgba(77,150,255,0.06); border: 1px solid rgba(77,150,255,0.2); border-radius: 8px; font-size: 0.82rem;'>
 <h5 style='margin: 0 0 0.5rem 0; color: #4D96FF; font-size: 0.88rem; display: flex; align-items: center; gap: 4px;'>📍 Route Directions</h5>
 {directions_html}
-</div>
-<div style="margin-top: 0.8rem; display: flex; justify-content: flex-end; gap: 10px;">
-<a href="https://www.google.com/maps/search/?api=1&query={item['lat']},{item['lon']}" target="_blank" style="text-decoration:none; background:#2D3748; color:#fff; font-size:0.85rem; font-weight:600; padding:8px 16px; border-radius:6px; display: inline-block; border: 1px solid rgba(255,255,255,0.1);">Google Maps 🗺️</a>
-<a href="{item["url"]}" target="_blank" style="text-decoration:none; background:#4D96FF; color:#fff; font-size:0.85rem; font-weight:600; padding:8px 16px; border-radius:6px; display: inline-block;">View Listing Page 🔗</a>
-</div>
 </div>"""
                 st.markdown(card_html, unsafe_allow_html=True)
                 
