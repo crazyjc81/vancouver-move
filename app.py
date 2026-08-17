@@ -4975,7 +4975,10 @@ def scrape_padmapper_vancouver(min_price=2000, max_price=5000, min_beds=2, max_b
         item_copy = dict(item)
         item_copy["source"] = "PadMapper"
         if "url" in item_copy:
-            item_copy["url"] = item_copy["url"].replace("zumper.com", "padmapper.com")
+            url = item_copy["url"].replace("zumper.com", "padmapper.com")
+            if "/listings/" in url:
+                url = url.replace("/listings/", "/apartments/")
+            item_copy["url"] = url
         padmapper_results.append(item_copy)
         
     return padmapper_results
