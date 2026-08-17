@@ -7964,10 +7964,10 @@ else:
 valid_travel_area = raw_travel_area
 # Subtract water mask to map land-only boundaries!
 try:
-    valid_travel_area = valid_travel_area.difference(VANCOUVER_WATER_MASK).simplify(0.00008, preserve_topology=True)
+    valid_travel_area = valid_travel_area.difference(VANCOUVER_WATER_MASK).simplify(0.0004, preserve_topology=True)
     # Also subtract it from individual polygons so map layers are clean land-only
     for mode in polygons:
-        polygons[mode] = polygons[mode].difference(VANCOUVER_WATER_MASK).simplify(0.00008, preserve_topology=True)
+        polygons[mode] = polygons[mode].difference(VANCOUVER_WATER_MASK).simplify(0.0004, preserve_topology=True)
 except Exception as e:
     pass
 
@@ -9000,7 +9000,7 @@ with col_map:
             if show_catchments and coords_catch and len(coords_catch) > 10:
                 try:
                     p = Polygon([(y, x) for x, y in coords_catch])
-                    p_simple = p.simplify(0.00008, preserve_topology=True)
+                    p_simple = p.simplify(0.0004, preserve_topology=True)
                     coords_catch = [(x, y) for y, x in p_simple.exterior.coords]
                 except Exception:
                     pass
