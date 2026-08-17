@@ -1480,15 +1480,9 @@ st.markdown("""
         border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
     
-    /* Completely transparent, zero-height header globally to prevent colored bars */
+    /* Immersive desktop view: completely hide the header and its menu options */
     header[data-testid="stHeader"], header[class*="stHeader"] {
-        background: transparent !important;
-        background-color: transparent !important;
-        height: 0px !important;
-        min-height: 0px !important;
-        overflow: visible !important;
-        border: none !important;
-        box-shadow: none !important;
+        display: none !important;
     }
     
     /* Hide top decorative theme line */
@@ -1550,6 +1544,7 @@ st.markdown("""
             background-color: transparent !important;
             height: 0px !important;
             min-height: 0px !important;
+            overflow: visible !important;
             border: none !important;
             box-shadow: none !important;
         }
