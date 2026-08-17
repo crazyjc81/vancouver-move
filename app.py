@@ -10240,21 +10240,27 @@ with col_details:
                 
                 # Fetch and display Craigslist listing body and images on the server side to bypass client-side IP blocks
                 if "craigslist" in item["source"].lower():
-                    with st.spinner("Fetching original description and photos..."):
-                        cl_details = fetch_craigslist_details(item["url"])
-                    
-                    if cl_details:
-                        if cl_details["images"]:
-                            img_tags = "".join([f'<img src="{src}" style="height: 140px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1);">' for src in cl_details["images"]])
-                            st.markdown(f"""
-                            <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-top: 0.8rem; margin-bottom: 0.8rem; scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
-                                {img_tags}
+                    with st.expander("📖 Original Description & Photos", expanded=True):
+                        with st.spinner("Fetching listing details..."):
+                            cl_details = fetch_craigslist_details(item["url"])
+                        if cl_details and (cl_details["body"] or cl_details["images"]):
+                            if cl_details["images"]:
+                                img_tags = "".join([f'<img src="{src}" style="height: 140px; border-radius: 8px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1);">' for src in cl_details["images"]])
+                                st.markdown(f"""
+                                <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-top: 0.4rem; margin-bottom: 0.8rem; scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
+                                    {img_tags}
+                                </div>
+                                """, unsafe_allow_html=True)
+                            if cl_details["body"]:
+                                st.markdown(f'<div style="font-size:0.9rem; line-height:1.5; color:#cbd5e1; white-space:pre-wrap; font-family:inherit;">{cl_details["body"]}</div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown("""
+                            <div style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.45; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.08);">
+                                ⚠️ <b>Listing Details Temporarily Unavailable:</b><br>
+                                Craigslist's security firewall blocked the server from retrieving the page content (rate-limit / IP restriction).<br><br>
+                                Please use the <b>Google Translate Proxy (No Block)</b> or <b>Wayback Machine</b> buttons in the warning panel above to view the original description and photos.
                             </div>
                             """, unsafe_allow_html=True)
-                            
-                        if cl_details["body"]:
-                            with st.expander("📖 Original Description", expanded=True):
-                                st.markdown(f'<div style="font-size:0.9rem; line-height:1.5; color:#cbd5e1; white-space:pre-wrap; font-family:inherit;">{cl_details["body"]}</div>', unsafe_allow_html=True)
                 
         elif t_type == "temp_housing":
             item = next((x for x in filtered_temp_housing if x["name"] == t_key), None)
