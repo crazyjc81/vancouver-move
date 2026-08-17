@@ -6902,6 +6902,93 @@ if 'listings_df' not in st.session_state:
     st.session_state.listings_df = pd.DataFrame(combined)
     st.session_state.is_live = False
 
+@st.cache_data(show_spinner=False, ttl=43200)
+def fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b):
+    results = {}
+    results["live_listings"] = scrape_craigslist_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["rif_listings"] = scrape_rent_it_furnished_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["liv_listings"] = scrape_liv_rent_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["zumper_listings"] = scrape_zumper_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["padmapper_listings"] = scrape_padmapper_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["rentfaster_listings"] = scrape_rent_faster_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["rentals_listings"] = scrape_rentals_ca_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["kijiji_listings"] = scrape_kijiji_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["rew_listings"] = scrape_rew_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["rentboard_listings"] = scrape_rentboard_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["gottarent_listings"] = scrape_gottarent_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["concert_listings"] = scrape_concert_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["bosa_listings"] = scrape_bosa_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["capreit_listings"] = scrape_capreit_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["hollyburn_listings"] = scrape_hollyburn_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    results["sublet_listings"] = scrape_craigslist_sublets_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+    
+    raw_list = []
+    for k, lst in results.items():
+        if lst:
+            raw_list.extend(lst)
+            
+    seen_urls = set()
+    candidates_to_fetch = []
+    for r in raw_list:
+        url = r.get("url")
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        title_lower = r.get("title", "").lower()
+        is_temp_candidate = False
+        if "unfurnished" not in title_lower and "un-furnished" not in title_lower:
+            if r.get("source") == "Rent It Furnished" or r.get("source") == "Craigslist (Sublet)" or "furnished" in title_lower or "sublet" in title_lower or "sub-let" in title_lower:
+                is_temp_candidate = True
+        rent = r.get("rent", 0)
+        beds = r.get("bedrooms", 0)
+        is_corporate_candidate = (2000 <= rent <= 5000 and 2 <= beds <= 4)
+        if is_temp_candidate or is_corporate_candidate:
+            candidates_to_fetch.append({"url": url, "source": r.get("source", "")})
+            
+    url_descriptions = {}
+    if candidates_to_fetch:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from curl_cffi import requests as cffi_requests
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        def fetch_single(url, source):
+            description = ""
+            try:
+                scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
+                if scraperapi_key:
+                    import urllib.parse
+                    import requests
+                    proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
+                    r = requests.get(proxy_url, timeout=10)
+                    html = r.text if r.status_code == 200 else ""
+                else:
+                    r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=3)
+                    html = r.text if r.status_code == 200 else ""
+                if html:
+                    soup = BeautifulSoup(html, 'html.parser')
+                    if "craigslist.org" in url:
+                        posting_body = soup.find(id="postingbody")
+                        if posting_body:
+                            description = posting_body.text.replace("QR Code Link to This Post", "").strip()
+                    elif "rentboard.ca" in url:
+                        desc_div = soup.find('div', class_='description') or soup.find(id='description')
+                        if desc_div:
+                            description = desc_div.text.strip()
+            except Exception:
+                pass
+            return url, description
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(fetch_single, c["url"], c.get("source", "")) for c in candidates_to_fetch]
+            for future in as_completed(futures):
+                url_val, desc_val = future.result()
+                if desc_val:
+                    url_descriptions[url_val] = desc_val
+                    
+    results["url_descriptions"] = url_descriptions
+    return results
+
 if 'custom_listings' not in st.session_state:
     st.session_state.custom_listings = load_custom_listings()
 
@@ -7075,159 +7162,38 @@ if "first_run_done" not in st.session_state:
 
     min_rent = 2500
     max_rent = 4500
+    min_rent = 2500
+    max_rent = 4500
     min_b = 2
     max_b = 3
 
-    total_steps = 18
-    step = 0
-
-    # Step 1: Craigslist
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping live Craigslist Vancouver...")
-    live_listings = scrape_craigslist_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 2: Rent It Furnished
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Rent It Furnished...")
-    rif_listings = scrape_rent_it_furnished_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 3: liv.rent
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping liv.rent listings...")
-    liv_listings = scrape_liv_rent_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 4: Zumper
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Zumper Vancouver...")
-    zumper_listings = scrape_zumper_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 5: PadMapper
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping PadMapper...")
-    padmapper_listings = scrape_padmapper_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 6: RentFaster
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping RentFaster...")
-    rentfaster_listings = scrape_rent_faster_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 7: Rentals.ca
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Rentals.ca...")
-    rentals_listings = scrape_rentals_ca_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 8: Kijiji
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Kijiji listings...")
-    kijiji_listings = scrape_kijiji_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 9: REW
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping REW.ca listings...")
-    rew_listings = scrape_rew_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 10: Rentboard
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Rentboard...")
-    rentboard_listings = scrape_rentboard_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 11: GottaRent
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping GottaRent...")
-    gottarent_listings = scrape_gottarent_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 12: Concert Properties
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Concert Properties...")
-    concert_listings = scrape_concert_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 13: Bosa Properties
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Bosa Properties...")
-    bosa_listings = scrape_bosa_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 14: CAPREIT
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping CAPREIT Vancouver...")
-    capreit_listings = scrape_capreit_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 15: Hollyburn Properties
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Hollyburn Properties...")
-    hollyburn_listings = scrape_hollyburn_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 16: Craigslist Sublets
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Scraping Craigslist Sublets...")
-    sublet_listings = scrape_craigslist_sublets_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-
-    # Step 17: Collect unique candidates for description caching
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Collecting candidates for description caching...")
+    update_loading_status(25, "Fetching rental listings from cache / proxy servers...")
+    results = fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b)
     
-    raw_live_listings = []
-    if live_listings:
-        raw_live_listings.extend(live_listings)
-    if rif_listings:
-        raw_live_listings.extend(rif_listings)
-    if liv_listings:
-        raw_live_listings.extend(liv_listings)
-    if zumper_listings:
-        raw_live_listings.extend(zumper_listings)
-    if padmapper_listings:
-        raw_live_listings.extend(padmapper_listings)
-    if rentfaster_listings:
-        raw_live_listings.extend(rentfaster_listings)
-    if rentals_listings:
-        raw_live_listings.extend(rentals_listings)
-    if kijiji_listings:
-        raw_live_listings.extend(kijiji_listings)
-    if rew_listings:
-        raw_live_listings.extend(rew_listings)
-    if rentboard_listings:
-        raw_live_listings.extend(rentboard_listings)
-    if gottarent_listings:
-        raw_live_listings.extend(gottarent_listings)
-    if concert_listings:
-        raw_live_listings.extend(concert_listings)
-    if bosa_listings:
-        raw_live_listings.extend(bosa_listings)
-    if capreit_listings:
-        raw_live_listings.extend(capreit_listings)
-    if hollyburn_listings:
-        raw_live_listings.extend(hollyburn_listings)
-    if sublet_listings:
-        raw_live_listings.extend(sublet_listings)
-
-    seen_urls = set()
-    candidates_to_fetch = []
-    for r in raw_live_listings:
-        url = r.get("url")
-        if not url or url in seen_urls:
-            continue
-        seen_urls.add(url)
-        
-        # A) Temporary stay candidate
-        title_lower = r.get("title", "").lower()
-        is_temp_candidate = False
-        if "unfurnished" not in title_lower and "un-furnished" not in title_lower:
-            if r.get("source") == "Rent It Furnished" or r.get("source") == "Craigslist (Sublet)" or "furnished" in title_lower or "sublet" in title_lower or "sub-let" in title_lower:
-                is_temp_candidate = True
-                
-        # B) Corporate landlord check candidate (price & bedrooms pass basic thresholds)
-        rent = r.get("rent", 0)
-        beds = r.get("bedrooms", 0)
-        is_corporate_candidate = (2000 <= rent <= 5000 and 2 <= beds <= 4)
-        
-        if is_temp_candidate or is_corporate_candidate:
-            candidates_to_fetch.append({"url": url, "source": r.get("source", "")})
-
-    # Step 15: Pre-fetching descriptions in parallel
-    step += 1
-    update_loading_status(int((step / total_steps) * 100), "Pre-fetching descriptions for corporate and temporary stay candidates...")
-    fetch_descriptions_for_candidates(candidates_to_fetch)
+    # Store descriptions in session state for normalizer use
+    if "url_descriptions" not in st.session_state:
+        st.session_state["url_descriptions"] = {}
+    st.session_state["url_descriptions"].update(results.get("url_descriptions", {}))
     
-    # Final step: Normalize all listings (utilizing the cached descriptions) and save
+    live_listings = results.get("live_listings", [])
+    rif_listings = results.get("rif_listings", [])
+    liv_listings = results.get("liv_listings", [])
+    zumper_listings = results.get("zumper_listings", [])
+    padmapper_listings = results.get("padmapper_listings", [])
+    rentfaster_listings = results.get("rentfaster_listings", [])
+    rentals_listings = results.get("rentals_listings", [])
+    kijiji_listings = results.get("kijiji_listings", [])
+    rew_listings = results.get("rew_listings", [])
+    rentboard_listings = results.get("rentboard_listings", [])
+    gottarent_listings = results.get("gottarent_listings", [])
+    concert_listings = results.get("concert_listings", [])
+    bosa_listings = results.get("bosa_listings", [])
+    capreit_listings = results.get("capreit_listings", [])
+    hollyburn_listings = results.get("hollyburn_listings", [])
+    sublet_listings = results.get("sublet_listings", [])
+
+    update_loading_status(85, "Normalizing details and mapping coordinates...")
+    
     all_list = []
     added_fallbacks = set()
     
@@ -7272,6 +7238,7 @@ if "first_run_done" not in st.session_state:
         add_to_all_list(item, is_fb=item.get("is_cache_fallback", False))
     for item in hollyburn_listings:
         add_to_all_list(item, is_fb=item.get("is_cache_fallback", False))
+        
     if live_listings:
         for item in live_listings:
             item_copy = dict(item)
@@ -7315,6 +7282,9 @@ with st.sidebar.expander("🏃 Commute Blob Settings", expanded=True):
         value=True,
         help="If checked, the colored commute isochrones (polygons) will be drawn on the map."
     )
+    if st.button("🔄 Force Refresh Listings", use_container_width=True, help="Clear all cached rental search results and trigger a fresh live scrape."):
+        fetch_all_raw_listings_cached.clear()
+        st.rerun()
 max_commute_slider = max_commute_mins / 30.0
 
 # Pre-defined mock values for removed Temporary Housing functionality
