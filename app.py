@@ -7193,19 +7193,6 @@ if "first_run_done" not in st.session_state:
 # st.markdown('<div class="subtitle-text">Spatial RoutingFootprints, Educational Catchments & Childcare Logistics</div>', unsafe_allow_html=True)
 
 # --- Sidebar Controls ---
-st.sidebar.markdown("## 🧭 Controller Matrix")
-
-# Reset/Change Destination Setup
-if st.sidebar.button("🔄 Change Destination Location", key="reset_destination_btn", use_container_width=True):
-    st.session_state.destination_set = False
-    # Clear map caches
-    if "m_cached" in st.session_state:
-        del st.session_state["m_cached"]
-    if "map_filters_stable" in st.session_state:
-        del st.session_state["map_filters_stable"]
-    st.rerun()
-
-st.sidebar.markdown("---")
 
 # Travel Blob Controller
 with st.sidebar.expander("🏃 Stage 1: Commute Blob Settings", expanded=True):
