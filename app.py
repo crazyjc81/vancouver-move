@@ -1474,6 +1474,12 @@ st.markdown("""
 
     /* Mobile Responsive Overrides */
     @media (max-width: 768px) {
+        /* Show the header on mobile so they can toggle the sidebar! */
+        header[data-testid="stHeader"], header[class*="stHeader"] {
+            display: flex !important;
+            background: transparent !important;
+        }
+        
         /* Enable vertical scrolling on mobile so stacked contents are reachable */
         html, body, .stApp, .stAppViewContainer, .main, div[data-testid="stAppViewContainer"], div[data-testid="stAppViewBlockContainer"], .main .block-container {
             overflow: auto !important;
@@ -8553,6 +8559,18 @@ with col_map:
         inspect_key = None
         
         hidden_target = st.session_state.get("inspect_target_hidden")
+        if hidden_target == "clear":
+            st.session_state["selected_inspect_target"] = None
+            st.session_state["inspect_target_hidden"] = ""
+            try:
+                if hasattr(st, "query_params"):
+                    st.query_params.clear()
+                else:
+                    st.experimental_set_query_params()
+            except Exception:
+                pass
+            st.rerun()
+            
         if hidden_target:
             parsed = urllib.parse.urlparse(hidden_target)
             params = urllib.parse.parse_qs(parsed.query)
@@ -9818,6 +9836,33 @@ with col_map:
             localStorage.setItem('vancouver_map_zoom', map_obj.getZoom());
         }});
         
+        // Register map background click event to collapse/clear the Feature Inspector
+        map_obj.on('click', function(e) {{
+            if (e.originalEvent && e.originalEvent.target && e.originalEvent.target.classList && e.originalEvent.target.classList.contains('leaflet-interactive')) {{
+                return;
+            }}
+            try {{
+                var parentWindow = window.parent;
+                var parentDoc = parentWindow.document;
+                var inputEl = parentDoc.querySelector('input[aria-label="inspect_target_hidden"]');
+                if (inputEl) {{
+                    var nativeInputValueSetter = Object.getOwnPropertyDescriptor(parentWindow.HTMLInputElement.prototype, "value").set;
+                    nativeInputValueSetter.call(inputEl, "clear");
+                    
+                    inputEl.dispatchEvent(new parentWindow.Event('input', {{ bubbles: true }}));
+                    inputEl.dispatchEvent(new parentWindow.Event('change', {{ bubbles: true }}));
+                    inputEl.dispatchEvent(new parentWindow.KeyboardEvent('keydown', {{
+                        key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true
+                    }}));
+                    if (typeof inputEl.focus === 'function') inputEl.focus();
+                    if (typeof inputEl.blur === 'function') inputEl.blur();
+                    console.log("Map background clicked. Cleared target.");
+                }}
+            }} catch(err) {{
+                console.error("Error clearing target on background click:", err);
+            }}
+        }});
+        
         // Setup direct marker click navigation to Feature Inspector (and prevent default popup opening)
         function registerDirectClick(layer) {{
             if (layer.getPopup && layer.getPopup()) {{
@@ -9953,7 +9998,29 @@ with col_details:
                 padding-right: 26vw !important;
             }
             
-            @media (max-width: 1200px) {
+            /* Mobile Bottom Sheet Overlay for Feature Inspector */
+            @media (max-width: 768px) {
+                div[data-testid="stColumn"]:has(input[aria-label="inspect_target_hidden"]),
+                div[data-testid="column"]:has(input[aria-label="inspect_target_hidden"]),
+                div[class*="stColumn"]:has(input[aria-label="inspect_target_hidden"]) {
+                    width: 100vw !important;
+                    min-width: 100vw !important;
+                    max-width: 100vw !important;
+                    height: 75vh !important;
+                    top: 25vh !important;
+                    bottom: 0 !important;
+                    right: 0 !important;
+                    left: 0 !important;
+                    border-radius: 20px 20px 0 0 !important;
+                    padding: 2.5rem 1.5rem 1.5rem 1.5rem !important;
+                    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5) !important;
+                }
+                div[data-testid="stAppViewContainer"] {
+                    padding-right: 0px !important;
+                }
+            }
+            
+            @media (min-width: 769px) and (max-width: 1200px) {
                 div[data-testid="stAppViewContainer"] {
                     padding-right: 360px !important;
                 }
@@ -10034,17 +10101,24 @@ with col_details:
             clear_query_params()
 
     if not selected_target:
-        # Dark-themed placeholder instructions card
-        placeholder_html = """
-        <div style="text-align: center; padding: 3rem 1.5rem; border: 2px dashed rgba(255, 255, 255, 0.08); border-radius: 12px; background: rgba(30, 34, 42, 0.4); margin-top: 1rem;">
-            <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.85;">🗺️</div>
-            <h4 style="color: #fff; margin: 0 0 0.5rem 0; font-size: 1.25rem; font-weight: 600;">Feature Inspector Panel</h4>
-            <p style="color: #a0aec0; font-size: 0.9rem; max-width: 280px; margin: 0 auto; line-height: 1.5;">
-                Click any property listing, public school, toy shop, superstore, electronics shop, or airport on the map to view specs, catchment details, and multi-modal commute routing.
-            </p>
-        </div>
-        """
-        st.markdown(placeholder_html, unsafe_allow_html=True)
+        st.markdown("""
+            <style>
+                div[data-testid="stColumn"]:has(input[aria-label="inspect_target_hidden"]),
+                div[data-testid="column"]:has(input[aria-label="inspect_target_hidden"]),
+                div[class*="stColumn"]:has(input[aria-label="inspect_target_hidden"]) {
+                    display: none !important;
+                    width: 0px !important;
+                    min-width: 0px !important;
+                    max-width: 0px !important;
+                    padding: 0 !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                }
+                div[data-testid="stAppViewContainer"] {
+                    padding-right: 0px !important;
+                }
+            </style>
+        """, unsafe_allow_html=True)
     else:
         # Add a clear selection button
         if st.button("❌ Clear Inspector Selection", use_container_width=True):
