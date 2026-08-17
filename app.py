@@ -1480,9 +1480,29 @@ st.markdown("""
         border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
     
-    /* Completely hide top header to eliminate empty space at the top */
+    /* Make header occupy zero vertical space but allow toggle button to be visible and clickable */
     header[data-testid="stHeader"], header[class*="stHeader"] {
-        display: none !important;
+        background: transparent !important;
+        height: 0px !important;
+        min-height: 0px !important;
+        overflow: visible !important;
+    }
+    
+    /* Style and float the sidebar toggle button for easy access on mobile and desktop */
+    div[data-testid="collapsedControl"] {
+        background-color: #1e293b !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        left: 12px !important;
+        top: 12px !important;
+        z-index: 999999 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    div[data-testid="collapsedControl"] button {
+        color: #ffffff !important;
     }
     
     /* Force Leaflet map iframe to be 100vh and completely flush edge-to-edge with no padding, borders, or shadows */
