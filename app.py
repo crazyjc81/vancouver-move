@@ -7184,9 +7184,7 @@ if "first_run_done" not in st.session_state:
         loading_placeholder.markdown(html, unsafe_allow_html=True)
 
     min_rent = 2500
-    max_rent = 4500
-    min_rent = 2500
-    max_rent = 4500
+    max_rent = 4000
     min_b = 2
     max_b = 3
 
@@ -7439,7 +7437,7 @@ with st.sidebar.expander("🏠 Financial Budget & Sources", expanded=True):
         "Monthly Rent Range (CAD)",
         min_value=1500,
         max_value=6500,
-        value=(2500, 4500),
+        value=(2500, 4000),
         step=100,
         help="Define your monthly rent budget range."
     )
