@@ -25,6 +25,30 @@ def load_env_variables():
 
 load_env_variables()
 
+def get_webshare_proxies():
+    """
+    Retrieves and parses Webshare proxy credentials from environment variables,
+    properly URL-encoding the username and password to prevent authentication (407) errors.
+    """
+    webshare_user = os.environ.get("WEBSHARE_USERNAME")
+    webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
+    if not (webshare_user and webshare_pass):
+        return None
+        
+    webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
+    webshare_port = os.environ.get("WEBSHARE_PORT", "80")
+    webshare_scheme = os.environ.get("WEBSHARE_SCHEME", "http")
+    
+    import urllib.parse
+    user_quoted = urllib.parse.quote(webshare_user)
+    pass_quoted = urllib.parse.quote(webshare_pass)
+    
+    proxy_url = f"{webshare_scheme}://{user_quoted}:{pass_quoted}@{webshare_host}:{webshare_port}"
+    return {
+        "http": proxy_url,
+        "https": proxy_url
+    }
+
 def extract_polygons(geom):
     """
     Recursively extract all Polygon objects from a Shapely geometry.
@@ -4012,18 +4036,10 @@ def fetch_craigslist_details(url):
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     try:
-        webshare_user = os.environ.get("WEBSHARE_USERNAME")
-        webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
-        webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
-        webshare_port = os.environ.get("WEBSHARE_PORT", "80")
-        
+        proxies = get_webshare_proxies()
         html = ""
         
-        if webshare_user and webshare_pass:
-            proxies = {
-                "http": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}",
-                "https": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}"
-            }
+        if proxies:
             from curl_cffi import requests as cffi_requests
             r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=12)
             if r.status_code == 200:
@@ -4091,16 +4107,8 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
         import random
         time.sleep(random.uniform(1.5, 3.5))
         
-        webshare_user = os.environ.get("WEBSHARE_USERNAME")
-        webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
-        webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
-        webshare_port = os.environ.get("WEBSHARE_PORT", "80")
-        
-        if webshare_user and webshare_pass:
-            proxies = {
-                "http": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}",
-                "https": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}"
-            }
+        proxies = get_webshare_proxies()
+        if proxies:
             from curl_cffi import requests as cffi_requests
             r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=12)
         else:
@@ -6968,18 +6976,10 @@ def fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b):
         def fetch_single(url, source):
             description = ""
             try:
-                webshare_user = os.environ.get("WEBSHARE_USERNAME")
-                webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
-                webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
-                webshare_port = os.environ.get("WEBSHARE_PORT", "80")
-                
+                proxies = get_webshare_proxies()
                 html = ""
                 
-                if webshare_user and webshare_pass:
-                    proxies = {
-                        "http": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}",
-                        "https": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}"
-                    }
+                if proxies:
                     r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=5)
                     html = r.text if r.status_code == 200 else ""
                 else:
