@@ -9225,6 +9225,10 @@ with col_map:
             if item.get("managed", False):
                 managed_line = f"🏢 Managed by: <b>{item['manager_name']}</b><br>"
                 
+            site_url = item["url"]
+            if "craigslist" in item["source"].lower():
+                site_url = f"https://translate.google.com/translate?sl=auto&tl=en&u={urllib.parse.quote(item['url'])}"
+                
             folium.Marker(
                 location=(item["lat"], item["lon"]),
                 popup=(
@@ -9236,7 +9240,7 @@ with col_map:
                     f"Childcare: {item['childcare']}<br>"
                     f"{commute_html}<br>"
                     f"<div style='margin-top:8px; display:flex; justify-content:space-between; align-items:center;'>"
-                    f"<a href='{item['url']}' target='_blank' style='color:#4D96FF; text-decoration:underline;'>View Site 🔗</a>"
+                    f"<a href='{site_url}' target='_blank' style='color:#4D96FF; text-decoration:underline;'>View Site 🔗</a>"
                     f"<a href='/?inspect_type=property&inspect_key={urllib.parse.quote(item['url'])}' target='_parent' style='background:#4D96FF; color:#fff; font-size:0.8rem; font-weight:600; padding:4px 8px; border-radius:4px; text-decoration:none;'>Inspect 🔍</a>"
                     f"</div>"
                 ),
@@ -10116,6 +10120,7 @@ with col_details:
                     title_query = urllib.parse.quote(f"site:craigslist.org \"{item['title']}\"")
                     google_search_url = f"https://www.google.com/search?q={title_query}"
                     wayback_url = f"https://web.archive.org/web/*/{item['url']}"
+                    translate_proxy_url = f"https://translate.google.com/translate?sl=auto&tl=en&u={urllib.parse.quote(item['url'])}"
                     
                     craigslist_warning_html = f"""
 <style>
@@ -10133,9 +10138,12 @@ with col_details:
         Craigslist is currently blocking direct listing pages in your browser (Error: <i>"Your request has been blocked"</i>).
     </p>
     <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 0.78rem;">
-        💡 <b>Tip:</b> All critical routing, school, and property details are already compiled below. To view the original page, you can search Google's cache or use Wayback Machine.
+        💡 <b>Tip:</b> Use the Translate Proxy link below to view the listing description and photos directly without needing a VPN.
     </p>
     <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px;">
+        <a href="{translate_proxy_url}" target="_blank" style="text-decoration:none; background: rgba(77, 150, 255, 0.18); color: #82b1ff; font-size: 0.76rem; font-weight: 700; padding: 6px 12px; border-radius: 5px; border: 1px solid rgba(77, 150, 255, 0.35); transition: background 0.2s; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+            Google Translate Proxy (No Block) 🚀
+        </a>
         <a href="{google_search_url}" target="_blank" style="text-decoration:none; background: rgba(255, 255, 255, 0.08); color: #fff; font-size: 0.76rem; font-weight: 600; padding: 5px 10px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.15); transition: background 0.2s; display: inline-flex; align-items: center; gap: 4px;">
             Google Cache Search 🔍
         </a>
