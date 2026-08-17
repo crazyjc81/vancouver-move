@@ -3833,48 +3833,59 @@ def get_isochrone_polygon(center_lat, center_lon, mode, scale=1.0):
         return Polygon(coords)
         
     elif mode == "Transit":
-        # Find closest transit station to the anchor office
-        anchor_stn = None
-        anchor_line = None
-        min_d = 999
-        for line, stations in TRANSIT_STATIONS.items():
-            for stn in stations:
-                d = haversine_distance(center_lat, center_lon, stn["coords"][0], stn["coords"][1])
-                if d < min_d:
-                    min_d = d
-                    anchor_stn = stn
-                    anchor_line = line
-                    
         # Define base pedestrian/bus coverage area around office
         base_poly = Point(center_lon, center_lat).buffer(0.025 * scale)
         polys_to_union = [base_poly]
         
-        # If office is near a SkyTrain station, add rail corridor coverage
-        if anchor_stn and min_d <= 1.5:
-            # Add all stations on the same line that are within the travel time budget
-            for stn in TRANSIT_STATIONS[anchor_line]:
-                train_dist = haversine_distance(stn["coords"][0], stn["coords"][1], anchor_stn["coords"][0], anchor_stn["coords"][1])
+        # Scan all transit lines to find stations close to the office (gateways)
+        # We allow a maximum walk distance of 1.2 km (approx 15-minute walk) to any station from the office
+        gateways = []
+        for line_name, stations in TRANSIT_STATIONS.items():
+            for stn in stations:
+                d = haversine_distance(center_lat, center_lon, stn["coords"][0], stn["coords"][1])
+                if d <= 1.2:
+                    # Walk time: dist * 13.33 minutes (at 4.5 km/h)
+                    walk_time = d * 13.33
+                    gateways.append({
+                        "station": stn,
+                        "line": line_name,
+                        "walk_time": walk_time
+                    })
+                    
+        # For each gateway, expand along its transit line
+        for gw in gateways:
+            gw_stn = gw["station"]
+            gw_line = gw["line"]
+            walk_to_gw = gw["walk_time"]
+            
+            for stn in TRANSIT_STATIONS[gw_line]:
+                train_dist = haversine_distance(stn["coords"][0], stn["coords"][1], gw_stn["coords"][0], gw_stn["coords"][1])
                 ride_time = train_dist * 1.5 + 3.0
+                total_time = walk_to_gw + ride_time
+                
                 # Commute budget is 30 mins * scale
-                if ride_time <= 30.0 * scale:
-                    # Walk radius shrinks as commute budget is spent on train ride
-                    rem_budget = 1.0 - (ride_time / (30.0 * scale))
+                if total_time <= 30.0 * scale:
+                    # Walk radius shrinks as commute budget is spent
+                    rem_time = (30.0 * scale) - total_time
+                    rem_budget = rem_time / (30.0 * scale)
                     if rem_budget > 0.05:
                         r_walk = 0.015 * rem_budget * scale
                         polys_to_union.append(Point(stn["coords"][1], stn["coords"][0]).buffer(r_walk))
                         
-            # If the line is Expo or Millennium, also allow transferring between them at Commercial-Broadway
-            if anchor_line in ["Expo Line", "Millennium Line"]:
-                transfer_line = "Millennium Line" if anchor_line == "Expo Line" else "Expo Line"
+            # If the gateway line is Expo or Millennium, allow transferring between them at Commercial-Broadway
+            if gw_line in ["Expo Line", "Millennium Line"]:
+                transfer_line = "Millennium Line" if gw_line == "Expo Line" else "Expo Line"
                 cb_coords = (49.2625, -123.0694)
-                d_to_cb = haversine_distance(anchor_stn["coords"][0], anchor_stn["coords"][1], cb_coords[0], cb_coords[1])
+                d_to_cb = haversine_distance(gw_stn["coords"][0], gw_stn["coords"][1], cb_coords[0], cb_coords[1])
                 ride_to_cb = d_to_cb * 1.5 + 3.0
+                total_to_cb = walk_to_gw + ride_to_cb
                 
                 for stn in TRANSIT_STATIONS[transfer_line]:
                     train_dist = haversine_distance(stn["coords"][0], stn["coords"][1], cb_coords[0], cb_coords[1])
-                    ride_time = ride_to_cb + 4.0 + (train_dist * 1.5 + 3.0) # 4 min transfer penalty
+                    ride_time = total_to_cb + 4.0 + (train_dist * 1.5 + 3.0) # 4 min transfer penalty
                     if ride_time <= 30.0 * scale:
-                        rem_budget = 1.0 - (ride_time / (30.0 * scale))
+                        rem_time = (30.0 * scale) - ride_time
+                        rem_budget = rem_time / (30.0 * scale)
                         if rem_budget > 0.05:
                             r_walk = 0.015 * rem_budget * scale
                             polys_to_union.append(Point(stn["coords"][1], stn["coords"][0]).buffer(r_walk))
