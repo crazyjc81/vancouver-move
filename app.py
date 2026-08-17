@@ -7294,7 +7294,7 @@ with st.sidebar.expander("🎓 School Catchment Filter", expanded=False):
     )
     show_catchments = st.checkbox(
         "Show Catchments",
-        value=True,
+        value=False,
         help="If checked, the colored school catchment boundary polygons will be drawn on the map."
     )
     show_private_schools = st.checkbox(
