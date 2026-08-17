@@ -6842,7 +6842,7 @@ def show_destination_setup_page():
         st.markdown("### 🗺️ Visual Pin Placement")
         # Render interactive map centered at current coordinates
         from streamlit_folium import st_folium
-        m = folium.Map(location=st.session_state.setup_coords, zoom_start=13, tiles="cartodbpositron")
+        m = folium.Map(location=st.session_state.setup_coords, zoom_start=13, tiles="cartodbpositron", prefer_canvas=True)
         
         # Add LatLngPopup to ensure Leaflet click events register on the map background
         folium.LatLngPopup().add_to(m)
@@ -7944,10 +7944,10 @@ else:
 valid_travel_area = raw_travel_area
 # Subtract water mask to map land-only boundaries!
 try:
-    valid_travel_area = valid_travel_area.difference(VANCOUVER_WATER_MASK)
+    valid_travel_area = valid_travel_area.difference(VANCOUVER_WATER_MASK).simplify(0.00008, preserve_topology=True)
     # Also subtract it from individual polygons so map layers are clean land-only
     for mode in polygons:
-        polygons[mode] = polygons[mode].difference(VANCOUVER_WATER_MASK)
+        polygons[mode] = polygons[mode].difference(VANCOUVER_WATER_MASK).simplify(0.00008, preserve_topology=True)
 except Exception as e:
     pass
 
@@ -8709,7 +8709,7 @@ with col_map:
 
     if recreate_map or "m_cached" not in st.session_state:
         # Initialize Folium Map centered on the dynamically preserved viewport state
-        m = folium.Map(location=st.session_state["center"], zoom_start=st.session_state["zoom"], tiles="cartodbpositron")
+        m = folium.Map(location=st.session_state["center"], zoom_start=st.session_state["zoom"], tiles="cartodbpositron", prefer_canvas=True)
         
         # Add Anchor Node Marker using unified vector SVG
         anchor_marker_html = f"""
@@ -8977,6 +8977,13 @@ with col_map:
         # Draw School Catchment Polygons & Markers
         for s_name, s_info in filtered_schools.items():
             coords_catch = [(lat, lon) for lon, lat in s_info["catchment_coords"]]
+            if show_catchments and coords_catch and len(coords_catch) > 10:
+                try:
+                    p = Polygon([(y, x) for x, y in coords_catch])
+                    p_simple = p.simplify(0.00008, preserve_topology=True)
+                    coords_catch = [(x, y) for y, x in p_simple.exterior.coords]
+                except Exception:
+                    pass
             
             # Fraser Institute Compare School Rankings color coding: 
             # Highest (7.6 - 10.0): Dark Green, Mid-High (6.0 - 7.5): Light Green, Mid-Low (4.1 - 5.9): Orange/Yellow, Lowest (0.0 - 4.0): Red
