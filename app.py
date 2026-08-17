@@ -4017,7 +4017,6 @@ def fetch_craigslist_details(url):
         webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
         webshare_port = os.environ.get("WEBSHARE_PORT", "80")
         
-        scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
         html = ""
         
         if webshare_user and webshare_pass:
@@ -4027,13 +4026,6 @@ def fetch_craigslist_details(url):
             }
             from curl_cffi import requests as cffi_requests
             r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=12)
-            if r.status_code == 200:
-                html = r.text
-        elif scraperapi_key:
-            import urllib.parse
-            import requests
-            proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
-            r = requests.get(proxy_url, timeout=15)
             if r.status_code == 200:
                 html = r.text
         else:
@@ -4104,7 +4096,6 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
         webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
         webshare_port = os.environ.get("WEBSHARE_PORT", "80")
         
-        scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
         if webshare_user and webshare_pass:
             proxies = {
                 "http": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}",
@@ -4112,11 +4103,6 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
             }
             from curl_cffi import requests as cffi_requests
             r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=12)
-        elif scraperapi_key:
-            import urllib.parse
-            import requests
-            proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
-            r = requests.get(proxy_url, timeout=15)
         else:
             from curl_cffi import requests as cffi_requests
             r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=8)
@@ -6987,7 +6973,6 @@ def fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b):
                 webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
                 webshare_port = os.environ.get("WEBSHARE_PORT", "80")
                 
-                scraperapi_key = os.environ.get("SCRAPERAPI_KEY")
                 html = ""
                 
                 if webshare_user and webshare_pass:
@@ -6996,12 +6981,6 @@ def fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b):
                         "https": f"http://{webshare_user}:{webshare_pass}@{webshare_host}:{webshare_port}"
                     }
                     r = cffi_requests.get(url, headers=headers, proxies=proxies, impersonate="chrome120", timeout=5)
-                    html = r.text if r.status_code == 200 else ""
-                elif scraperapi_key:
-                    import urllib.parse
-                    import requests
-                    proxy_url = f"http://api.scraperapi.com?api_key={scraperapi_key}&url={urllib.parse.quote(url)}"
-                    r = requests.get(proxy_url, timeout=10)
                     html = r.text if r.status_code == 200 else ""
                 else:
                     r = cffi_requests.get(url, headers=headers, impersonate="chrome120", timeout=3)
