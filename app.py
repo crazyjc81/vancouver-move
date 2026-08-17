@@ -1480,12 +1480,21 @@ st.markdown("""
         border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
     }
     
-    /* Make header occupy zero vertical space but allow toggle button to be visible and clickable */
+    /* Completely transparent, zero-height header globally to prevent colored bars */
     header[data-testid="stHeader"], header[class*="stHeader"] {
         background: transparent !important;
+        background-color: transparent !important;
         height: 0px !important;
         min-height: 0px !important;
         overflow: visible !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Hide top decorative theme line */
+    div[data-testid="stDecoration"] {
+        display: none !important;
+        height: 0px !important;
     }
     
     /* Style and float the sidebar toggle button for easy access on mobile and desktop */
@@ -1534,10 +1543,15 @@ st.markdown("""
             margin-top: 50px !important;
         }
         
-        /* Show the header on mobile so they can toggle the sidebar! */
+        /* Show the header on mobile so they can toggle the sidebar but keep it transparent and zero-height */
         header[data-testid="stHeader"], header[class*="stHeader"] {
             display: flex !important;
             background: transparent !important;
+            background-color: transparent !important;
+            height: 0px !important;
+            min-height: 0px !important;
+            border: none !important;
+            box-shadow: none !important;
         }
         
         /* Enable vertical scrolling on mobile so stacked contents are reachable */
