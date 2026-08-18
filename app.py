@@ -4272,8 +4272,39 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
     except Exception as e:
         err_msg = str(e)
         if "407" in err_msg:
+            webshare_user = None
+            webshare_pass = None
+            try:
+                import streamlit as st
+                if hasattr(st, "secrets"):
+                    if "WEBSHARE_USERNAME" in st.secrets:
+                        webshare_user = st.secrets["WEBSHARE_USERNAME"]
+                    if "WEBSHARE_PASSWORD" in st.secrets:
+                        webshare_pass = st.secrets["WEBSHARE_PASSWORD"]
+            except Exception:
+                pass
+            if not webshare_user:
+                webshare_user = os.environ.get("WEBSHARE_USERNAME")
+            if not webshare_pass:
+                webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
+                
+            user_status = "❌ Not Loaded"
+            if webshare_user:
+                user_status = f"✅ Loaded (starts with '{str(webshare_user).strip()[:3]}...', length {len(str(webshare_user).strip())})"
+            pass_status = "❌ Not Loaded"
+            if webshare_pass:
+                pass_status = f"✅ Loaded (length {len(str(webshare_pass).strip())})"
+                
+            webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
+            webshare_port = os.environ.get("WEBSHARE_PORT", "80")
+            
             st.warning(
-                "⚠️ **Live Craigslist crawl failed: Webshare proxy returned HTTP 407 (Authentication Required).**\n\n"
+                f"⚠️ **Live Craigslist crawl failed: Webshare proxy returned HTTP 407 (Authentication Required).**\n\n"
+                f"**Loaded Proxy Settings for Diagnostic:**\n"
+                f"- **Host**: `{webshare_host}`\n"
+                f"- **Port**: `{webshare_port}`\n"
+                f"- **WEBSHARE_USERNAME**: {user_status}\n"
+                f"- **WEBSHARE_PASSWORD**: {pass_status}\n\n"
                 "To resolve this, please check the following:\n"
                 "1. **Switch to Password Authorization**: Ensure that you have **Password Authorization** enabled (rather than IP Authorization) in your Webshare.io dashboard under the proxy settings.\n"
                 "2. **Check Bandwidth**: Confirm that your Webshare account has remaining data/bandwidth.\n"
