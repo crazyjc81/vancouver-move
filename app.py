@@ -1503,6 +1503,7 @@ st.markdown("""
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        pointer-events: auto !important;
     }
     div[data-testid="collapsedControl"] button {
         color: #ffffff !important;
@@ -1532,11 +1533,6 @@ st.markdown("""
 
     /* Mobile Responsive Overrides */
     @media (max-width: 768px) {
-        /* Push the entire webpage down on mobile to clear safe-areas, notches, and browser address bars */
-        .stApp {
-            margin-top: 50px !important;
-        }
-        
         /* Show the header on mobile so they can toggle the sidebar but keep it transparent and zero-height */
         header[data-testid="stHeader"], header[class*="stHeader"] {
             display: flex !important;
@@ -1547,6 +1543,9 @@ st.markdown("""
             overflow: visible !important;
             border: none !important;
             box-shadow: none !important;
+            pointer-events: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
         }
         
         /* Enable vertical scrolling on mobile so stacked contents are reachable */
