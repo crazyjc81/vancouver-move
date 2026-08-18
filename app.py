@@ -10187,6 +10187,19 @@ with col_details:
                 white-space: nowrap !important;
                 border: 0 !important;
             }
+            .sheet-grab-handle {
+                width: 40px;
+                height: 4px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 2px;
+                margin: -0.5rem auto 1rem auto;
+                display: none; /* Hide on desktop */
+            }
+            @media (max-width: 768px) {
+                .sheet-grab-handle {
+                    display: block;
+                }
+            }
         </style>
     """, unsafe_allow_html=True)
     
@@ -10228,29 +10241,108 @@ with col_details:
             clear_query_params()
 
     if not selected_target:
+        # Dynamic Browse View styling for mobile (38vh height, top 62vh)
         st.markdown("""
             <style>
-                div[data-testid="stColumn"]:has(input[aria-label="inspect_target_hidden"]),
-                div[data-testid="column"]:has(input[aria-label="inspect_target_hidden"]),
-                div[class*="stColumn"]:has(input[aria-label="inspect_target_hidden"]) {
-                    display: none !important;
-                    width: 0px !important;
-                    min-width: 0px !important;
-                    max-width: 0px !important;
-                    padding: 0 !important;
-                    border: none !important;
-                    box-shadow: none !important;
-                }
-                div[data-testid="stAppViewContainer"] {
-                    padding-right: 0px !important;
+                @media (max-width: 768px) {
+                    div[data-testid="stColumn"]:has(input[aria-label="inspect_target_hidden"]),
+                    div[data-testid="column"]:has(input[aria-label="inspect_target_hidden"]),
+                    div[class*="stColumn"]:has(input[aria-label="inspect_target_hidden"]) {
+                        height: 38vh !important;
+                        top: 62vh !important;
+                        padding: 1.5rem 1.2rem 1.2rem 1.2rem !important;
+                    }
                 }
             </style>
         """, unsafe_allow_html=True)
+        
+        st.markdown('<div style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: #FFF; display: flex; align-items: center; gap: 8px;">🏡 Listings Directory <span style="background: rgba(16, 185, 129, 0.15); color: #10B981; font-size: 0.75rem; padding: 2px 8px; border-radius: 9999px; font-weight: 600;">' + str(len(filtered_listings)) + ' match</span></div>', unsafe_allow_html=True)
+        
+        if len(filtered_listings) == 0:
+            st.info("No properties match your active filters. Try expanding your price range or travel time threshold in the sidebar!")
+        else:
+            col_s1, col_s2 = st.columns([1.8, 1.2])
+            with col_s1:
+                search_q = st.text_input("Search listings...", label_visibility="collapsed", placeholder="🔍 Filter listings...", key="directory_search_q")
+            with col_s2:
+                sort_option = st.selectbox("Sort", ["Price: Low", "Price: High", "Rating: High"], label_visibility="collapsed", key="directory_sort_opt")
+            
+            listings_to_show = list(filtered_listings)
+            
+            if search_q:
+                q = search_q.lower()
+                listings_to_show = [
+                    x for x in listings_to_show 
+                    if q in x.get("title", "").lower() or q in x.get("description", "").lower() or q in x.get("school", "").lower()
+                ]
+                
+            if sort_option == "Price: Low":
+                listings_to_show.sort(key=lambda x: x.get("rent", 999999))
+            elif sort_option == "Price: High":
+                listings_to_show.sort(key=lambda x: x.get("rent", 0), reverse=True)
+            elif sort_option == "Rating: High":
+                listings_to_show.sort(key=lambda x: x.get("rating", 0), reverse=True)
+                
+            st.markdown(f'<div style="font-size: 0.78rem; color: #64748B; margin-bottom: 0.5rem;">Showing {len(listings_to_show)} of {len(filtered_listings)} properties</div>', unsafe_allow_html=True)
+            
+            for idx, item in enumerate(listings_to_show[:30]):
+                source = item.get("source", "Unknown")
+                rating = item.get("rating", "N/A")
+                
+                card_html = f"""
+                <div style="
+                    background: rgba(30, 41, 59, 0.45); 
+                    border: 1px solid rgba(255, 255, 255, 0.06); 
+                    border-radius: 12px; 
+                    padding: 12px; 
+                    margin-top: 8px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                        <span style="font-size: 1.15rem; font-weight: bold; color: #10B981;">${item['rent']:,} <span style="font-size: 0.72rem; color: #94A3B8; font-weight: normal;">CAD/mo</span></span>
+                        <span style="background: rgba(14, 165, 233, 0.18); color: #38BDF8; font-size: 0.68rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">{source}</span>
+                    </div>
+                    <div style="color: #F1F5F9; font-weight: 600; font-size: 0.88rem; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;">{item.get('title', 'Rental Unit')}</div>
+                    <div style="display: flex; gap: 8px; font-size: 0.78rem; color: #94A3B8; margin-bottom: 6px;">
+                        <span>🛏️ {item.get('bedrooms', 0)} Bed</span>
+                        <span>🚿 {item.get('bathrooms', 0)} Bath</span>
+                        <span>⭐ Rating: <span style="color:#FFD93D; font-weight:600;">{rating}</span></span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748B; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 2px;">🎓 <b>Elem Catchment:</b> {item.get('school', 'None')}</div>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
+                
+                if st.button("🔍 Inspect & Route Details", key=f"insp_list_{idx}_{item['url']}", use_container_width=True):
+                    st.session_state["selected_inspect_target"] = {
+                        "type": "property",
+                        "key": item["url"]
+                    }
+                    st.session_state["center"] = [item["lat"], item["lon"]]
+                    st.session_state["zoom"] = 14
+                    st.session_state["inspect_target_hidden"] = f"/?inspect_type=property&inspect_key={urllib.parse.quote(item['url'])}"
+                    st.rerun()
     else:
-        # Add a clear selection button
-        if st.button("❌ Clear Inspector Selection", use_container_width=True):
+        # Dynamic Detail View styling for mobile (75vh height, top 25vh)
+        st.markdown("""
+            <style>
+                @media (max-width: 768px) {
+                    div[data-testid="stColumn"]:has(input[aria-label="inspect_target_hidden"]),
+                    div[data-testid="column"]:has(input[aria-label="inspect_target_hidden"]),
+                    div[class*="stColumn"]:has(input[aria-label="inspect_target_hidden"]) {
+                        height: 75vh !important;
+                        top: 25vh !important;
+                        padding: 2.5rem 1.5rem 1.5rem 1.5rem !important;
+                    }
+                }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Add a clear selection button styled as back to directory
+        if st.button("⬅️ Back to Listings Directory", use_container_width=True):
             st.session_state["selected_inspect_target"] = None
             st.session_state["clear_hidden_input_flag"] = True
+            st.session_state["inspect_target_hidden"] = ""
             clear_query_params()
             st.rerun()
 
