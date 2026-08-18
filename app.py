@@ -27,18 +27,53 @@ load_env_variables()
 
 def get_webshare_proxies():
     """
-    Retrieves and parses Webshare proxy credentials from environment variables,
+    Retrieves and parses Webshare proxy credentials from Streamlit Secrets or environment variables,
     properly URL-encoding the username and password to prevent authentication (407) errors.
     """
-    webshare_user = os.environ.get("WEBSHARE_USERNAME")
-    webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
+    webshare_user = None
+    webshare_pass = None
+    
+    # 1. Try Streamlit Secrets first
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets"):
+            if "WEBSHARE_USERNAME" in st.secrets:
+                webshare_user = st.secrets["WEBSHARE_USERNAME"]
+            if "WEBSHARE_PASSWORD" in st.secrets:
+                webshare_pass = st.secrets["WEBSHARE_PASSWORD"]
+    except Exception:
+        pass
+        
+    # 2. Fall back to environment variables
+    if not webshare_user:
+        webshare_user = os.environ.get("WEBSHARE_USERNAME")
+    if not webshare_pass:
+        webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
+        
     if not (webshare_user and webshare_pass):
         return None
         
-    webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io")
-    webshare_port = os.environ.get("WEBSHARE_PORT", "80")
-    webshare_scheme = os.environ.get("WEBSHARE_SCHEME", "http")
+    # Strip whitespace to prevent copy-paste spacing bugs
+    webshare_user = str(webshare_user).strip()
+    webshare_pass = str(webshare_pass).strip()
     
+    webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io").strip()
+    webshare_port = os.environ.get("WEBSHARE_PORT", "80").strip()
+    webshare_scheme = os.environ.get("WEBSHARE_SCHEME", "http").strip()
+    
+    # Check Streamlit secrets for overrides on host/port/scheme
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets"):
+            if "WEBSHARE_HOST" in st.secrets:
+                webshare_host = str(st.secrets["WEBSHARE_HOST"]).strip()
+            if "WEBSHARE_PORT" in st.secrets:
+                webshare_port = str(st.secrets["WEBSHARE_PORT"]).strip()
+            if "WEBSHARE_SCHEME" in st.secrets:
+                webshare_scheme = str(st.secrets["WEBSHARE_SCHEME"]).strip()
+    except Exception:
+        pass
+        
     import urllib.parse
     user_quoted = urllib.parse.quote(webshare_user)
     pass_quoted = urllib.parse.quote(webshare_pass)
@@ -4235,7 +4270,18 @@ def scrape_craigslist_vancouver(min_price=2000, max_price=4200, min_beds=2, max_
             return valid_items
             
     except Exception as e:
-        st.warning(f"Live Craigslist crawl failed ({e}). Reverting to curated listing cache.")
+        err_msg = str(e)
+        if "407" in err_msg:
+            st.warning(
+                "⚠️ **Live Craigslist crawl failed: Webshare proxy returned HTTP 407 (Authentication Required).**\n\n"
+                "To resolve this, please check the following:\n"
+                "1. **Switch to Password Authorization**: Ensure that you have **Password Authorization** enabled (rather than IP Authorization) in your Webshare.io dashboard under the proxy settings.\n"
+                "2. **Check Bandwidth**: Confirm that your Webshare account has remaining data/bandwidth.\n"
+                "3. **Verify Secrets**: Double-check that `WEBSHARE_USERNAME` and `WEBSHARE_PASSWORD` in your Streamlit Cloud secrets are correct and have no leading/trailing spaces.\n\n"
+                "Reverting to curated listing cache for now."
+            )
+        else:
+            st.warning(f"Live Craigslist crawl failed ({e}). Reverting to curated listing cache.")
         filtered_cache = []
         for item in CRAIGSLIST_CACHE:
             if min_price <= item["rent"] <= max_price and min_beds <= item["bedrooms"] <= max_beds:
