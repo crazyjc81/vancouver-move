@@ -27,62 +27,9 @@ load_env_variables()
 
 def get_webshare_proxies():
     """
-    Retrieves and parses Webshare proxy credentials from Streamlit Secrets or environment variables,
-    properly URL-encoding the username and password to prevent authentication (407) errors.
+    Disabled. Returns None to bypass all proxies and execute direct crawls.
     """
-    webshare_user = None
-    webshare_pass = None
-    
-    # 1. Try Streamlit Secrets first
-    try:
-        import streamlit as st
-        if hasattr(st, "secrets"):
-            if "WEBSHARE_USERNAME" in st.secrets:
-                webshare_user = st.secrets["WEBSHARE_USERNAME"]
-            if "WEBSHARE_PASSWORD" in st.secrets:
-                webshare_pass = st.secrets["WEBSHARE_PASSWORD"]
-    except Exception:
-        pass
-        
-    # 2. Fall back to environment variables
-    if not webshare_user:
-        webshare_user = os.environ.get("WEBSHARE_USERNAME")
-    if not webshare_pass:
-        webshare_pass = os.environ.get("WEBSHARE_PASSWORD")
-        
-    if not (webshare_user and webshare_pass):
-        return None
-        
-    # Strip whitespace to prevent copy-paste spacing bugs
-    webshare_user = str(webshare_user).strip()
-    webshare_pass = str(webshare_pass).strip()
-    
-    webshare_host = os.environ.get("WEBSHARE_HOST", "p.webshare.io").strip()
-    webshare_port = os.environ.get("WEBSHARE_PORT", "80").strip()
-    webshare_scheme = os.environ.get("WEBSHARE_SCHEME", "http").strip()
-    
-    # Check Streamlit secrets for overrides on host/port/scheme
-    try:
-        import streamlit as st
-        if hasattr(st, "secrets"):
-            if "WEBSHARE_HOST" in st.secrets:
-                webshare_host = str(st.secrets["WEBSHARE_HOST"]).strip()
-            if "WEBSHARE_PORT" in st.secrets:
-                webshare_port = str(st.secrets["WEBSHARE_PORT"]).strip()
-            if "WEBSHARE_SCHEME" in st.secrets:
-                webshare_scheme = str(st.secrets["WEBSHARE_SCHEME"]).strip()
-    except Exception:
-        pass
-        
-    import urllib.parse
-    user_quoted = urllib.parse.quote(webshare_user)
-    pass_quoted = urllib.parse.quote(webshare_pass)
-    
-    proxy_url = f"{webshare_scheme}://{user_quoted}:{pass_quoted}@{webshare_host}:{webshare_port}"
-    return {
-        "http": proxy_url,
-        "https": proxy_url
-    }
+    return None
 
 def extract_polygons(geom):
     """
@@ -7036,8 +6983,63 @@ if 'listings_df' not in st.session_state:
     st.session_state.listings_df = pd.DataFrame(combined)
     st.session_state.is_live = False
 
+import sqlite3
+import json
+import time
+
+def get_shared_db_cache(min_rent, max_rent, min_b, max_b):
+    try:
+        conn = sqlite3.connect("shared_cache.db")
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS listings_cache (
+                key TEXT PRIMARY KEY,
+                timestamp REAL,
+                data TEXT
+            )
+        """)
+        conn.commit()
+        
+        key = f"{min_rent}_{max_rent}_{min_b}_{max_b}"
+        c.execute("SELECT timestamp, data FROM listings_cache WHERE key = ?", (key,))
+        row = c.fetchone()
+        conn.close()
+        
+        if row:
+            timestamp, data_str = row
+            # 12 hours = 43200 seconds
+            if time.time() - timestamp < 43200:
+                return json.loads(data_str)
+    except Exception:
+        pass
+    return None
+
+def save_shared_db_cache(min_rent, max_rent, min_b, max_b, results):
+    try:
+        conn = sqlite3.connect("shared_cache.db")
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS listings_cache (
+                key TEXT PRIMARY KEY,
+                timestamp REAL,
+                data TEXT
+            )
+        """)
+        key = f"{min_rent}_{max_rent}_{min_b}_{max_b}"
+        c.execute("INSERT OR REPLACE INTO listings_cache (key, timestamp, data) VALUES (?, ?, ?)",
+                  (key, time.time(), json.dumps(results)))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
 @st.cache_data(show_spinner=False, ttl=43200)
 def fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b):
+    # Try to load from SQLite shared database cache first
+    cached_results = get_shared_db_cache(min_rent, max_rent, min_b, max_b)
+    if cached_results:
+        return cached_results
+        
     results = {}
     results["live_listings"] = scrape_craigslist_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
     results["rif_listings"] = scrape_rent_it_furnished_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
@@ -7120,6 +7122,7 @@ def fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b):
                     url_descriptions[url_val] = desc_val
                     
     results["url_descriptions"] = url_descriptions
+    save_shared_db_cache(min_rent, max_rent, min_b, max_b, results)
     return results
 
 if 'custom_listings' not in st.session_state:
@@ -7596,30 +7599,54 @@ with st.sidebar.expander("🏠 Financial Budget & Sources", expanded=True):
     refresh_clicked = st.button("🔄 Refresh Latest Housing Data", use_container_width=True)
     
     if trigger_refresh or refresh_clicked:
-        with st.spinner("Scraping live Craigslist, Rent It Furnished, liv.rent, Zumper, PadMapper, RentFaster, Rentals.ca, Kijiji, REW, Rentboard, GottaRent, Concert Properties, and aggregating partner networks..."):
-            active_beds_val = bedrooms_label
-            if isinstance(active_beds_val, list):
-                min_b = min(active_beds_val) if active_beds_val else 2
-                max_b = max(active_beds_val) if active_beds_val else 3
-            else:
-                min_b = 1 if active_beds_val == "1+" else (3 if active_beds_val == "3+" else 2)
-                max_b = 4 if min_b == 1 else (3 if min_b == 2 else 4)
-            live_listings = scrape_craigslist_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            rif_listings = scrape_rent_it_furnished_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            liv_listings = scrape_liv_rent_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            zumper_listings = scrape_zumper_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            padmapper_listings = scrape_padmapper_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            rentfaster_listings = scrape_rent_faster_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            rentals_listings = scrape_rentals_ca_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            kijiji_listings = scrape_kijiji_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            rew_listings = scrape_rew_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            rentboard_listings = scrape_rentboard_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            gottarent_listings = scrape_gottarent_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            concert_listings = scrape_concert_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            bosa_listings = scrape_bosa_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            capreit_listings = scrape_capreit_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            hollyburn_listings = scrape_hollyburn_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
-            sublet_listings = scrape_craigslist_sublets_vancouver(min_price=min_rent, max_price=max_rent, min_beds=min_b, max_beds=max_b)
+        active_beds_val = bedrooms_label
+        if isinstance(active_beds_val, list):
+            min_b = min(active_beds_val) if active_beds_val else 2
+            max_b = max(active_beds_val) if active_beds_val else 3
+        else:
+            min_b = 1 if active_beds_val == "1+" else (3 if active_beds_val == "3+" else 2)
+            max_b = 4 if min_b == 1 else (3 if min_b == 2 else 4)
+            
+        min_rent = rent_range[0]
+        max_rent = rent_range[1]
+        
+        if refresh_clicked:
+            # Clear both Streamlit in-memory cache and SQLite cache
+            fetch_all_raw_listings_cached.clear()
+            try:
+                conn = sqlite3.connect("shared_cache.db")
+                c = conn.cursor()
+                key = f"{min_rent}_{max_rent}_{min_b}_{max_b}"
+                c.execute("DELETE FROM listings_cache WHERE key = ?", (key,))
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+                
+        with st.spinner("Fetching latest rental listings from database / cache..."):
+            results = fetch_all_raw_listings_cached(min_rent, max_rent, min_b, max_b)
+            
+            # Store descriptions in session state for normalizer use
+            if "url_descriptions" not in st.session_state:
+                st.session_state["url_descriptions"] = {}
+            st.session_state["url_descriptions"].update(results.get("url_descriptions", {}))
+            
+            live_listings = results.get("live_listings", [])
+            rif_listings = results.get("rif_listings", [])
+            liv_listings = results.get("liv_listings", [])
+            zumper_listings = results.get("zumper_listings", [])
+            padmapper_listings = results.get("padmapper_listings", [])
+            rentfaster_listings = results.get("rentfaster_listings", [])
+            rentals_listings = results.get("rentals_listings", [])
+            kijiji_listings = results.get("kijiji_listings", [])
+            rew_listings = results.get("rew_listings", [])
+            rentboard_listings = results.get("rentboard_listings", [])
+            gottarent_listings = results.get("gottarent_listings", [])
+            concert_listings = results.get("concert_listings", [])
+            bosa_listings = results.get("bosa_listings", [])
+            capreit_listings = results.get("capreit_listings", [])
+            hollyburn_listings = results.get("hollyburn_listings", [])
+            sublet_listings = results.get("sublet_listings", [])
             
             all_list = []
             added_fallbacks = set()
@@ -7674,7 +7701,7 @@ with st.sidebar.expander("🏠 Financial Budget & Sources", expanded=True):
             st.session_state.listings_df = pd.DataFrame(all_list)
             st.session_state.is_live = True
             if refresh_clicked:
-                st.success(f"Success! Fetched {len(live_listings)} Craigslist, {len(sublet_listings)} Craigslist Sublets, {len(rif_listings)} Rent It Furnished, {len(liv_listings)} liv.rent, {len(zumper_listings)} Zumper, {len(padmapper_listings)} PadMapper, {len(rentfaster_listings)} RentFaster, {len(rentals_listings)} Rentals.ca, {len(kijiji_listings)} Kijiji, {len(rew_listings)} REW, {len(rentboard_listings)} Rentboard, {len(gottarent_listings)} GottaRent, {len(concert_listings)} Concert, {len(bosa_listings)} Bosa, {len(capreit_listings)} CAPREIT, and {len(hollyburn_listings)} Hollyburn listings.")
+                st.success(f"Success! Refreshed data layers.")
     
     restrict_houses_to_commute = st.checkbox(
         "Restrict Houses to Commute Area",
